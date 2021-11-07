@@ -1,0 +1,11 @@
+[workspace]
+
+members = [
+    "lexical",
+    "syntax",
+    "intermediate-code",
+    "machine-code",
+    "general",
+    "tests"
+]
+
