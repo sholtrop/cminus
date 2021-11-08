@@ -1,15 +1,22 @@
-// extern crate pest;
-// extern crate pest_derive;
-
-use pest::Parser;
+use pest::{error::Error as ParseError, Parser};
 use pest_derive::Parser;
-
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
 struct LexicalParser;
 
-pub fn parse() {
-    let pairs = LexicalParser::parse(Rule::ident_list, "a1 b2").unwrap_or_else(|e| panic!("{}", e));
+pub fn parse() -> Result<(), ParseError<Rule>> {
+    let pairs = LexicalParser::parse(
+        Rule::program,
+        "
+    int main(void) {
+        int a = 0, b;
+        return 0;
+    }",
+    )
+    .map_err(|err| {
+        log::error!("{}", err);
+        err
+    })?;
 
     // Because ident_list is silent, the iterator will contain idents
     for pair in pairs {
@@ -17,14 +24,9 @@ pub fn parse() {
         println!("Rule:    {:?}", pair.as_rule());
         println!("Span:    {:?}", pair.as_span());
         println!("Text:    {}", pair.as_str());
-
-        // A pair can be converted to an iterator of the tokens which make it up:
-        for inner_pair in pair.into_inner() {
-            match inner_pair.as_rule() {
-                Rule::alpha => println!("Letter:  {}", inner_pair.as_str()),
-                Rule::digit => println!("Digit:   {}", inner_pair.as_str()),
-                _ => unreachable!(),
-            };
-        }
+        // println!("Miep:    {:?}", pair.tokens());
+        println!();
     }
+
+    Ok(())
 }

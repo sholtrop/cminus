@@ -7,5 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+general = { path = "../general" }
 pest = "2.1.3"
 pest_derive = "2.1.0"
+log = "0.4.14"

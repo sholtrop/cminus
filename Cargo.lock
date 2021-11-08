@@ -129,6 +129,8 @@ version = "0.1.0"
 name = "lexical"
 version = "0.1.0"
 dependencies = [
+ "general",
+ "log",
  "pest",
  "pest_derive",
 ]
