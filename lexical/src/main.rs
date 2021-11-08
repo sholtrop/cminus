@@ -1,3 +1,7 @@
+mod lib;
+
+use lib::parse;
+
 fn main() {
-    println!("Hello, world!");
+    parse();
 }
