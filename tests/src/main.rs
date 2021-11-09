@@ -1,19 +1,19 @@
 use std::io;
 
 use general::logging::init_logger;
-use tests::run_tests_in_path;
+use tests::collect_tests_in_path;
 use tests::TestStats;
 
 const PROGRAM_TEST_PATH: &str = "tests/testfiles/programs";
 const UNIT_TEST_PATH: &str = "tests/testfiles/units";
 
 fn unit_tests(stats: &mut TestStats) -> io::Result<()> {
-    run_tests_in_path(UNIT_TEST_PATH, stats)?;
+    collect_tests_in_path(UNIT_TEST_PATH, stats)?;
     Ok(())
 }
 
 fn program_tests(stats: &mut TestStats) -> io::Result<()> {
-    run_tests_in_path(PROGRAM_TEST_PATH, stats)?;
+    collect_tests_in_path(PROGRAM_TEST_PATH, stats)?;
     Ok(())
 }
 

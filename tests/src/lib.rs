@@ -1,5 +1,6 @@
 use std::fs;
 use std::io;
+use std::iter::Iterator;
 use std::path::PathBuf;
 
 const CORRECT_TEST_DIR: &str = "correct";
@@ -22,9 +23,8 @@ type TestFunction = fn(String) -> Result<(), TestFailed>;
 
 pub struct Test {
     name: String,
-    file_contents: String,
+    path: PathBuf,
     expectation: Expectation,
-    test_fn: TestFunction,
 }
 
 pub struct TestStats {
@@ -54,11 +54,15 @@ pub fn run_test(test: Test) -> Result<(), TestFailed> {
     }
 }
 
-pub fn run_tests_in_path(path: impl Into<PathBuf>, stats: &mut TestStats) -> io::Result<()> {
+pub fn collect_tests_in_path(
+    path: impl Into<PathBuf>,
+    stats: &mut TestStats,
+) -> io::Result<Vec<Test>> {
+    let mut tests: Vec<Test> = Vec::new();
     for entry in fs::read_dir(path.into())? {
         let entry = entry?;
         if entry.metadata()?.is_dir() {
-            run_tests_in_path(entry.path(), stats)?;
+            collect_tests_in_path(entry.path(), stats)?;
         } else {
             let file = entry.file_name().into_string().unwrap();
             if file.ends_with(".c") {
@@ -70,18 +74,16 @@ pub fn run_tests_in_path(path: impl Into<PathBuf>, stats: &mut TestStats) -> io:
                 } else {
                     Expectation::Fail
                 };
-
-                if let Ok(()) = run_test(Test {
+                tests.push(Test {
                     expectation,
-                    file_contents: fs::read_to_string(entry.path())?,
+                    // file_contents: fs::read_to_string(entry.path())?,
                     name: entry.path().into_os_string().into_string().unwrap(),
-                    test_fn: |c| Ok(()),
-                }) {
-                    stats.success += 1;
-                }
-                stats.total += 1;
+                    path: entry.path(),
+                });
             }
         }
     }
-    Ok(())
+    Ok(tests)
 }
+
+pub fn get_tests_in_path(path: impl Into<PathBuf>, stats: &mut TestStats) -> impl Iterator {}

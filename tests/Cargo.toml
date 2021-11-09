@@ -8,4 +8,5 @@ edition = "2018"
 
 [dependencies]
 general = { path = "../general" }
+lexical = { path = "../lexical" } 
 log = "0.4.14"
