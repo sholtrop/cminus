@@ -12,6 +12,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ascii_tree"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca6c635b3aa665c649ad1415f1573c85957dfa47690ec27aebe7ec17efe3c643"
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -84,6 +90,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "escape_string"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "950d57ba8ed401b9818cad43fcf52d719cde08e2be8657ad334bd95df9501be6"
+
+[[package]]
 name = "fake-simd"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -132,6 +144,7 @@ dependencies = [
  "general",
  "log",
  "pest",
+ "pest_ascii_tree",
  "pest_derive",
 ]
 
@@ -179,6 +192,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "10f4872ae94d7b90ae48754df22fd42ad52ce740b8f370b03da4835417403e53"
 dependencies = [
  "ucd-trie",
+]
+
+[[package]]
+name = "pest_ascii_tree"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4152b393638a9816cd3dedb5aea2fb60ab0b641315aa133cea219c8797e768fc"
+dependencies = [
+ "ascii_tree",
+ "escape_string",
+ "pest",
+ "pest_derive",
 ]
 
 [[package]]
