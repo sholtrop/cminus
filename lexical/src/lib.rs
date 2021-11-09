@@ -9,5 +9,3 @@ pub fn parse(input: &str) -> Result<Pairs<Rule>, ParseError<Rule>> {
     let pairs = LexicalParser::parse(Rule::program, input)?;
     Ok(pairs)
 }
-
-pub fn test() {}

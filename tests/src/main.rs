@@ -2,23 +2,22 @@ use std::io;
 
 use general::logging::init_logger;
 use tests::collect_tests_in_path;
+use tests::run_test;
+use tests::TestStage;
 use tests::TestStats;
 
-const PROGRAM_TEST_PATH: &str = "tests/testfiles/programs";
-const UNIT_TEST_PATH: &str = "tests/testfiles/units";
-
-fn unit_tests(stats: &mut TestStats) -> io::Result<()> {
-    collect_tests_in_path(UNIT_TEST_PATH, stats)?;
+fn run_tests(stats: &mut TestStats, stage: TestStage) -> io::Result<()> {
+    for path in stage.get_paths() {
+        collect_tests_in_path(path, stats)?
+            .into_iter()
+            .for_each(|test| {
+                stats.total += 1;
+                if run_test(test, stage.into()).is_ok() {
+                    stats.success += 1;
+                }
+            });
+    }
     Ok(())
-}
-
-fn program_tests(stats: &mut TestStats) -> io::Result<()> {
-    collect_tests_in_path(PROGRAM_TEST_PATH, stats)?;
-    Ok(())
-}
-
-fn specific_tests(stats: &mut TestStats) -> io::Result<()> {
-    todo!("Implement");
 }
 
 fn main() -> io::Result<()> {
@@ -27,8 +26,7 @@ fn main() -> io::Result<()> {
         success: 0,
     };
     init_logger();
-    unit_tests(&mut stats)?;
-    program_tests(&mut stats)?;
+    run_tests(&mut stats, TestStage::Lexical)?;
     log::info!("[{} / {}] TESTS PASSED", stats.success, stats.total);
     Ok(())
 }
