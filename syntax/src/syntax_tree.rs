@@ -10,3 +10,11 @@ pub struct FunctionRoot {
 pub struct SyntaxTree {
     pub functions: HashMap<FunctionId, FunctionRoot>,
 }
+
+impl SyntaxTree {
+    pub fn new() -> Self {
+        Self {
+            functions: HashMap::new(),
+        }
+    }
+}

@@ -1,7 +1,24 @@
-pub struct SymbolId(usize);
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct SymbolId(pub usize);
 
-pub struct FunctionId(usize);
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct FunctionId(pub usize);
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub struct ParameterId(pub usize);
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct VariableId(pub usize);
 
-pub struct ParameterId(usize);
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct SymbolName(pub String);
 
-pub struct VariableId(usize);
+impl From<ParameterId> for SymbolId {
+    fn from(id: ParameterId) -> Self {
+        SymbolId(id.0)
+    }
+}
+
+impl From<SymbolId> for FunctionId {
+    fn from(id: SymbolId) -> Self {
+        FunctionId(id.0)
+    }
+}

@@ -1,6 +1,6 @@
 use core::fmt;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum ReturnType {
     Unknown,
     Error,
@@ -41,7 +41,7 @@ impl fmt::Display for ReturnType {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum SymbolType {
     Unknown,
     Error,
@@ -71,7 +71,7 @@ impl fmt::Display for SymbolType {
         )
     }
 }
-
+#[derive(Clone)]
 pub struct Symbol {
     name: String,
     return_type: ReturnType,
