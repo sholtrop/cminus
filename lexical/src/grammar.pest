@@ -4,7 +4,7 @@ program = _{ SOI ~ declaration_list ~ EOI}
 alpha = { 'a'..'z' | 'A'..'Z' }
 digit = { '0'..'9' }
 
-ident = { (alpha | "_") ~ (alpha | digit | "_")* }
+ident = { !keyword ~ ((alpha | "_") ~ (alpha | digit | "_")*) }
 
 number = { digit+ }
 
@@ -32,7 +32,7 @@ array_decl = { ident ~ "[" ~ number ~ "]" }
 
 void = { "void" } 
 
-type_specifier = { "uint8_t" | "int8_t" | "int" | "unsigned" }
+type_specifier = { "unsigned int" | "uint8_t" | "int8_t" | "int" | "unsigned" }
 
 formal_parameters = _{ parameter+ | void }
 
@@ -80,7 +80,7 @@ additive_op = { "+" | "-" }
 
 mult_expression = _{ factor ~ (mult_op ~ mult_expression)* }
 
-mult_op = { "*" | "/" }
+mult_op = { "*" | "/" | "%" }
 
 factor = _{ "(" ~ expression ~ ")" | function_call | var | number | unary ~ factor }
 
@@ -88,10 +88,12 @@ unary = { "-" | "!" | "+" }
 
 array_access = { ident ~ "[" ~ expression ~ "]" }
 
-function_call = { ident ~ "(" ~ actual_parameters ~ ")" }
+function_call = { ident ~ "(" ~ actual_parameters? ~ ")" }
 
 actual_parameters = { expression ~ ("," ~ expression)* }
 
 iteration_stmt = { "while" ~ "(" ~ expression ~ ")" ~ statement }
 
 selection_stmt = { "if" ~ "(" ~ expression ~ ")" ~ statement ~ ("else" ~ statement)? }
+
+keyword = { "if" | "else" | "while" | "return" | type_specifier | "void" }

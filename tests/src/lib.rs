@@ -3,7 +3,7 @@ use std::io;
 use std::iter::Iterator;
 use std::path::PathBuf;
 
-const CORRECT_TEST_DIR: &str = "correct";
+const INCORRECT_TEST_DIR: &str = "incorrect";
 const PROGRAM_DIR: &str = "programs";
 const PROGRAM_TEST_PATH: &str = "tests/testfiles/programs";
 const UNIT_TEST_PATH: &str = "tests/testfiles/units";
@@ -81,8 +81,16 @@ pub fn run_test(test: Test, test_function: TestFunction) -> Result<(), TestFaile
             log::info!("PASSED {}", test.name);
             Ok(())
         }
-        _ => {
-            log::error!("FAILED {}", test.name);
+        (Err(_), Expectation::Fail) => {
+            log::info!("PASSED {}", test.name);
+            Ok(())
+        }
+        (Err(_), Expectation::Success) => {
+            log::error!("FAILED {}\nExpected Success, got Fail", test.name);
+            Err(().into())
+        }
+        (Ok(_), Expectation::Fail) => {
+            log::error!("FAILED {}\nExpected Fail, got Success", test.name);
             Err(().into())
         }
     }
@@ -102,11 +110,11 @@ pub fn collect_tests_in_path(
             if file.ends_with(".c") {
                 let expectation = if entry.path().ancestors().any(|path| {
                     let p = path.to_str().unwrap();
-                    p.ends_with(CORRECT_TEST_DIR) || p.ends_with(PROGRAM_DIR)
+                    p.ends_with(INCORRECT_TEST_DIR) && !p.ends_with(PROGRAM_DIR)
                 }) {
-                    Expectation::Success
-                } else {
                     Expectation::Fail
+                } else {
+                    Expectation::Success
                 };
                 tests.push(Test {
                     expectation,
