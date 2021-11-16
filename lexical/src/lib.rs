@@ -1,4 +1,8 @@
-use pest::{error::Error as ParseError, iterators::Pairs, Parser};
+use pest::{
+    error::Error as ParseError,
+    iterators::{Pair, Pairs},
+    Parser,
+};
 use pest_derive::Parser;
 
 #[derive(Parser)]
@@ -9,3 +13,6 @@ pub fn parse(input: &str) -> Result<Pairs<Rule>, ParseError<Rule>> {
     let pairs = LexicalParser::parse(Rule::program, input)?;
     Ok(pairs)
 }
+
+pub type ParseTree<'a> = Pairs<'a, Rule>;
+pub type ParseNode<'a> = Pair<'a, Rule>;

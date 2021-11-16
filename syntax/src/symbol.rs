@@ -1,5 +1,7 @@
 use core::fmt;
 
+use crate::id::SymbolName;
+
 #[derive(PartialEq, Clone)]
 pub enum ReturnType {
     Unknown,
@@ -16,7 +18,6 @@ pub enum ReturnType {
     Real,
     Bool,
 }
-
 impl fmt::Display for ReturnType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -38,6 +39,31 @@ impl fmt::Display for ReturnType {
                 ReturnType::Bool => "bool",
             }
         )
+    }
+}
+
+impl From<&str> for ReturnType {
+    fn from(string: &str) -> Self {
+        match string {
+            "int" => Self::Int,
+            "int8_t" => Self::Int8,
+            "void" => Self::Void,
+            "unsigned int" | "unsigned" => Self::Uint,
+            "uint8_t" => Self::Uint8,
+            _ => Self::Error,
+        }
+    }
+}
+
+impl ReturnType {
+    fn to_array_type(&self) -> Self {
+        match *self {
+            Self::Int => Self::IntArray,
+            Self::Int8 => Self::Int8Array,
+            Self::Uint => Self::UintArray,
+            Self::Uint8 => Self::Uint8Array,
+            _ => Self::Error,
+        }
     }
 }
 
@@ -73,18 +99,18 @@ impl fmt::Display for SymbolType {
 }
 #[derive(Clone)]
 pub struct Symbol {
-    name: String,
-    return_type: ReturnType,
-    symbol_type: SymbolType,
-    line: usize,
+    pub name: SymbolName,
+    pub return_type: ReturnType,
+    pub symbol_type: SymbolType,
+    pub line: usize,
 }
 
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "[{} {} {}]",
-            self.name, self.return_type, self.symbol_type
+            "{}. [{:?} Ret:{} Type:{}]",
+            self.line, self.name, self.return_type, self.symbol_type
         )
     }
 }

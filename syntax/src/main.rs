@@ -1,3 +1,6 @@
+use general::logging;
+use syntax::generate;
+
 mod builder;
 mod error;
 mod id;
@@ -7,6 +10,10 @@ mod symbol;
 mod symbol_table;
 mod syntax_tree;
 
-fn main() {
-    println!("Hello, world!");
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    logging::init_logger();
+    let input = std::fs::read_to_string(
+        "/home/sholtrop/development/rust/cminus/syntax/tests/node/correct/statementlist_funccall.c",
+    )?;
+    generate(&input).and(Ok(()))
 }

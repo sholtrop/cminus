@@ -1,24 +1,16 @@
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Copy)]
 pub struct SymbolId(pub usize);
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct FunctionId(pub usize);
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ParameterId(pub usize);
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct VariableId(pub usize);
-
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct SymbolName(pub String);
 
-impl From<ParameterId> for SymbolId {
-    fn from(id: ParameterId) -> Self {
-        SymbolId(id.0)
+impl From<&str> for SymbolName {
+    fn from(name: &str) -> Self {
+        Self(name.to_string())
     }
 }
 
-impl From<SymbolId> for FunctionId {
-    fn from(id: SymbolId) -> Self {
-        FunctionId(id.0)
+impl std::fmt::Display for SymbolName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

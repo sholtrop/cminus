@@ -122,6 +122,7 @@ pub enum Node {
         return_type: ReturnType,
         symbol_id: u32,
     },
+    Empty,
 }
 
 // pub struct UnaryNode {
