@@ -32,26 +32,37 @@ impl SyntaxBuilder {
     }
 
     pub fn parsetree_to_syntaxtree(
-        &mut self,
+        mut self,
         tree: ParseTree,
     ) -> Result<SyntaxTree, SyntaxBuilderError> {
-        log::trace!("{}", tree.as_str());
-        for node in tree {
-            log::info!("NODE: {}", node.as_str());
+        self.build_tree_recursive(tree)?;
+        Ok(self.tree)
+    }
+
+    fn build_tree_recursive(&mut self, parse_tree: ParseTree) -> Result<(), SyntaxBuilderError> {
+        for node in parse_tree {
             match node.as_rule() {
                 Rule::fn_declaration => {
                     self.handle_fn_declaration(node.into_inner())?;
                 }
-                Rule::COMMENT | Rule::WHITESPACE => {}
+                Rule::statement => {
+                    log::trace!("statement `{}`", node.as_str());
+                }
+
+                Rule::COMMENT | Rule::WHITESPACE | Rule::EOI => {}
                 Rule::linebreak => {
                     self.current_line += 1;
                 }
                 _ => {
-                    log::warn!("Unimplemented rule: {:?}", node.as_rule());
+                    log::warn!(
+                        "Unimplemented rule `{:?}`: {}",
+                        node.as_rule(),
+                        node.as_str()
+                    );
                 }
             }
         }
-        Err(SyntaxBuilderError::from("Not implemented"))
+        Ok(())
     }
 
     fn add_builtins() {
@@ -141,14 +152,14 @@ impl SyntaxBuilder {
         let params = func_components.next().ok_or("Missing function params")?;
         let func_body = func_components.next().ok_or("Missing function body")?;
         log::trace!(
-            "Function decl: ret:{} name:{} params:{} body:{}",
+            "Function decl:\nret: {}\nname: {}\nparams: {}\nbody:\n{}",
             type_specifier,
             ident,
             params.as_str(),
             func_body.as_str(),
         );
         self.enter_function(ident.into(), type_specifier.into())?;
-        self.parsetree_to_syntaxtree(func_body.into_inner())?;
+        self.build_tree_recursive(func_body.into_inner())?;
         self.leave_function();
         Ok(())
     }

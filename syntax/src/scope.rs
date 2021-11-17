@@ -33,9 +33,7 @@ impl ScopeManager {
     }
 
     pub fn enter_new_scope(&mut self) {
-        self.scope_stack.push(Scope {
-            symbols: HashMap::new(),
-        })
+        self.scope_stack.push(Scope::new())
     }
 
     pub fn leave_scope(&mut self) {
@@ -60,11 +58,25 @@ impl ScopeManager {
         }
     }
 
+    /// Returns the [SymbolId] of the symbol with the given name, if it exists.
+    /// Will first try the most local scope, then the scope above that etc. until the global scope.
     pub fn get_symbol_id(&self, name: &SymbolName) -> Option<SymbolId> {
-        Some(*self.scope_stack.last()?.symbols.get(name)?)
+        for scope in self.scope_stack.iter().rev() {
+            if let Some(id) = scope.symbols.get(name) {
+                return Some(*id);
+            }
+        }
+        None
     }
 
+    /// Whether the symbol with `name` is defined in the current scope.
+    /// Does not consider higher scopes.
     pub fn symbol_is_defined(&self, name: &SymbolName) -> bool {
-        self.get_symbol_id(name).is_some()
+        self.scope_stack
+            .last()
+            .expect("Invariant violated: Scope stack was empty")
+            .symbols
+            .get(name)
+            .is_some()
     }
 }

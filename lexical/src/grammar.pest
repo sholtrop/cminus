@@ -44,7 +44,7 @@ compound_stmt = { "{" ~ statement_list ~ "}" }
 
 statement_list = _{ statement* }
 
-statement = { 
+statement = _{ 
     var_declaration 
     | compound_stmt 
     | return_stmt 
@@ -52,6 +52,7 @@ statement = {
     | selection_stmt
     | expression_stmt 
 }
+
 return_stmt = { "return" ~ expression_stmt }
 
 expression_stmt = { expression ~ ";" | ";" }

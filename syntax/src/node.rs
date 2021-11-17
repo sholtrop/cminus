@@ -1,8 +1,10 @@
-use core::fmt;
-
 use crate::symbol::ReturnType;
+use core::fmt;
+use ptree::TreeItem;
+use std::ops::Deref;
+use std::{borrow::Cow, vec};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum NodeType {
     Unknown,
     Error,
@@ -91,7 +93,7 @@ impl fmt::Display for NodeType {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum ConstantNodeValue {
     Uint8(u8),
     Int8(i8),
@@ -99,7 +101,22 @@ pub enum ConstantNodeValue {
     Unsigned(u32),
 }
 
-#[derive(PartialEq)]
+impl fmt::Display for ConstantNodeValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Uint8(v) => v.to_string(),
+                Self::Int8(v) => v.to_string(),
+                Self::Int(v) => v.to_string(),
+                Self::Unsigned(v) => v.to_string(),
+            }
+        )
+    }
+}
+
+#[derive(PartialEq, Clone)]
 pub enum Node {
     Unary {
         node_type: NodeType,
@@ -125,14 +142,54 @@ pub enum Node {
     Empty,
 }
 
-// pub struct UnaryNode {
-//     node: Node,
-// }
+impl TreeItem for Node {
+    type Child = Self;
+    fn write_self<W: std::io::Write>(&self, f: &mut W, _: &ptree::Style) -> std::io::Result<()> {
+        match self {
+            Self::Unary {
+                node_type,
+                return_type,
+                ..
+            } => write!(f, "Unary[{} - {}]", node_type, return_type),
+            Self::Binary {
+                node_type,
+                return_type,
+                ..
+            } => write!(f, "Bin[{} - {}]", node_type, return_type),
+            Self::Constant {
+                node_type, value, ..
+            } => write!(f, "Const[{} - {}]", node_type, value),
+            Self::Symbol {
+                node_type,
+                symbol_id,
+                ..
+            } => write!(f, "Sym[{} - ID:{}]", node_type, symbol_id),
+            Self::Empty => write!(f, "[EMPTY]"),
+        }
+    }
 
-// pub struct BinaryNode {
-//     node: Node,
-// }
-
-// pub struct ConstantNode {}
-
-// pub struct SymbolNode {}
+    fn children(&self) -> Cow<[Self::Child]> {
+        match self {
+            Self::Unary { child, .. } => {
+                if let Some(node) = child {
+                    Cow::from(vec![node.deref().clone()])
+                } else {
+                    Cow::from(vec![])
+                }
+            }
+            Self::Binary { left, right, .. } => {
+                let mut vec: Vec<Node> = vec![];
+                if let Some(node) = left {
+                    vec.push(node.deref().clone());
+                }
+                if let Some(node) = right {
+                    vec.push(node.deref().clone());
+                }
+                Cow::from(vec)
+            }
+            Self::Constant { .. } => Cow::from(vec![]),
+            Self::Symbol { .. } => Cow::from(vec![]),
+            Self::Empty => Cow::from(vec![]),
+        }
+    }
+}

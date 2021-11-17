@@ -1,6 +1,3 @@
-use general::logging;
-use syntax::generate;
-
 mod builder;
 mod error;
 mod id;
@@ -9,6 +6,10 @@ mod scope;
 mod symbol;
 mod symbol_table;
 mod syntax_tree;
+mod visitor;
+
+use general::logging;
+use syntax::generate;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     logging::init_logger();
