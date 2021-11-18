@@ -2,8 +2,9 @@ use crate::{
     id::*,
     symbol::{Symbol, SymbolType},
 };
-use std::{borrow::Borrow, collections::HashMap};
+use std::collections::HashMap;
 
+#[derive(Clone, Copy)]
 pub enum SymbolScope {
     Local { owning_function_id: SymbolId },
     Global,
@@ -35,40 +36,45 @@ impl SymbolTable {
         }
     }
 
-    pub fn add_symbol(&mut self, symbol: Symbol) -> SymbolId {
+    pub fn add_symbol(&mut self, symbol: Symbol, scope: SymbolScope) -> SymbolId {
         let id = SymbolId(self.id_count);
+        let sym_type = symbol.symbol_type;
         self.symbols.insert(
             id,
             SymbolInfo {
                 id,
                 symbol,
-                symbol_scope: SymbolScope::Global,
+                symbol_scope: scope,
             },
         );
+
+        if let SymbolScope::Local { owning_function_id } = scope {
+            let func_info = self
+                .functions
+                .get_mut(&owning_function_id)
+                .expect("Invariant violated: Function id not found");
+            match sym_type {
+                SymbolType::Parameter => {
+                    func_info.parameters.push(id);
+                }
+                SymbolType::Variable => {
+                    func_info.variables.push(id);
+                }
+                _ => {}
+            };
+        }
+
         self.id_count += 1;
         id
     }
 
-    pub fn add_function(
-        &mut self,
-        function: Symbol,
-        variables: Vec<Symbol>,
-        parameters: Vec<Symbol>,
-    ) -> SymbolId {
-        let variables = variables
-            .into_iter()
-            .map(|var| self.add_symbol(var))
-            .collect();
-        let parameters = parameters
-            .into_iter()
-            .map(|param| self.add_symbol(param))
-            .collect();
-        let id = self.add_symbol(function);
+    pub fn add_function(&mut self, function: Symbol) -> SymbolId {
+        let id = self.add_symbol(function, SymbolScope::Global);
         self.functions.insert(
             id,
             FunctionInfo {
-                parameters,
-                variables,
+                parameters: vec![],
+                variables: vec![],
             },
         );
 

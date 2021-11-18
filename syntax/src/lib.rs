@@ -6,25 +6,22 @@ mod scope;
 mod symbol;
 mod symbol_table;
 mod syntax_tree;
+mod tree_walker;
 mod visitor;
 
+use lexical::ParseTree;
 use std::error::Error;
-use symbol_table::SymbolTable;
-use syntax_tree::SyntaxTree;
+use tree_walker::TreeWalker;
+use visitor::{SyntaxResult, Visitor};
 
-use crate::builder::SyntaxBuilder;
-
-pub struct SyntaxResult {
-    tree: SyntaxTree,
-    symbol_table: SymbolTable,
-}
-
-/// Take an input string and generate a [SyntaxTree] and [SymbolTable] for it.
-/// They are returned in the form of a [SyntaxResult].
-pub fn generate(input: &str) -> Result<SyntaxResult, Box<dyn Error>> {
-    let parse_tree = lexical::parse(input)?;
-    let builder = SyntaxBuilder::new();
-    let syntax_tree = builder.parsetree_to_syntaxtree(parse_tree)?;
-    log::trace!("{}", syntax_tree);
+/// Take an input [ParseTree] and generate a [SyntaxResult] for it containing the syntax tree + symbol table.
+pub fn generate(input: ParseTree) -> Result<SyntaxResult, Box<dyn Error>> {
+    // let parse_tree = lexical::parse(input)?;
+    let mut tree_walker = TreeWalker::new();
+    let mut visitor = Visitor::new();
+    tree_walker.walk_tree(input, &mut visitor)?;
+    let SyntaxResult { symbol_table, tree } = visitor.result();
+    log::trace!("{}", tree);
+    // log::trace!("{:?}", symbol_table);
     Err("Syntax tree generation not fully implemented yet".into())
 }
