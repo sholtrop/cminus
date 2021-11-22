@@ -1,5 +1,8 @@
 use crate::{
-    error::SyntaxBuilderError, id::SymbolName, node::SyntaxNode, symbol::ReturnType,
+    error::SyntaxBuilderError,
+    id::SymbolName,
+    node::{NodeType, SyntaxNode},
+    symbol::ReturnType,
     visitor::Visitor,
 };
 use itertools::Itertools;
@@ -21,57 +24,107 @@ impl TreeWalker {
         Self { current_line: 1 }
     }
 
-    pub fn walk_tree(
+    pub fn construct_syntax_tree(
         &mut self,
         parse_tree: ParseTree,
         visitor: &mut Visitor,
-    ) -> Result<SyntaxNode, SyntaxBuilderError> {
+    ) -> Result<(), SyntaxBuilderError> {
         for node in parse_tree {
-            match node.as_rule() {
-                Rule::fn_declaration => {
-                    let FunctionParts {
-                        return_type,
-                        name,
-                        params,
-                        body,
-                    } = self.get_function_parts(node)?;
-                    log::trace!(
-                        "Function decl:\nret: {}\nname: {}\nparams: {}\n",
-                        return_type,
-                        name,
-                        params.as_str(),
-                    );
-                    visitor.visit_func_start(
-                        SymbolName(name),
-                        ReturnType::from(return_type.as_str()),
-                    )?;
-                    self.handle_param_decl(params, visitor)?;
-                    let func_body = self.walk_tree(body.into_inner(), visitor)?;
-                    // visitor.att
-                    // visitor.visit_func_end();
-                }
-                Rule::compound_stmt => {
-                    log::trace!("compound statement");
-                    visitor.add_local_scope();
-                    self.walk_tree(node.into_inner(), visitor)?;
-                    visitor.leave_local_scope();
-                }
-                // Rule::statement => visitor.visit_statement(node),
-                Rule::linebreak => {
-                    self.current_line += 1;
-                }
-                Rule::COMMENT | Rule::WHITESPACE | Rule::EOI => {}
-                _ => {
-                    log::warn!(
-                        "Unimplemented rule `{:?}`:\n{}. {}",
-                        node.as_rule(),
-                        self.current_line,
-                        node.as_str()
-                    );
-                }
+            self.walk_tree(node, visitor)?;
+        }
+        Ok(())
+    }
+
+    fn walk_tree(
+        &mut self,
+        parse_node: ParseNode,
+        visitor: &mut Visitor,
+    ) -> Result<Option<SyntaxNode>, SyntaxBuilderError> {
+        match parse_node.as_rule() {
+            Rule::fn_declaration => {
+                let FunctionParts {
+                    return_type,
+                    name,
+                    params,
+                    body,
+                } = self.get_function_parts(parse_node)?;
+                log::trace!(
+                    "Function decl:\nret: {}\nname: {}\nparams: {}\n",
+                    return_type,
+                    name,
+                    params.as_str(),
+                );
+                let id = visitor
+                    .visit_func_start(SymbolName(name), ReturnType::from(return_type.as_str()))?;
+                self.handle_param_decl(params, visitor)?;
+                let func_body = self.walk_tree(body, visitor)?.unwrap_or(SyntaxNode::Empty);
+                visitor.visit_func_end(&id, func_body);
+                Ok(None)
+            }
+            Rule::compound_stmt => {
+                log::trace!("compound statement");
+                visitor.add_local_scope();
+                let statements: Vec<SyntaxNode> = parse_node
+                    .into_inner()
+                    .into_iter()
+                    .map(|node| {
+                        self.walk_tree(node, visitor)
+                            .unwrap_or_else(|e| {
+                                log::warn!("Error in compound_stmt {}", e);
+                                Some(SyntaxNode::create_error(e))
+                            })
+                            .unwrap_or_else(|| {
+                                SyntaxNode::create_error("Node was not parsed to statement")
+                            })
+                    })
+                    .collect();
+                let root = visitor.visit_statement_list(statements)?;
+                visitor.leave_local_scope();
+                Ok(Some(root))
+            }
+            Rule::function_call => {
+                log::trace!("Function call: {}", parse_node.as_str());
+                let (func_name, params) =
+                    parse_node.into_inner().collect_tuple().ok_or_else(|| {
+                        SyntaxBuilderError::new("Could not split func call into name and params")
+                    })?;
+                let func_name = SymbolName(func_name.to_string());
+                let params: Vec<SyntaxNode> = params
+                    .into_inner()
+                    .map(|param| {
+                        self.walk_tree(param, visitor)
+                            .unwrap_or_else(|err| Some(SyntaxNode::create_error(err)))
+                            .unwrap_or_else(|| {
+                                SyntaxNode::create_error("No expression was created")
+                            })
+                    })
+                    .collect();
+                let func_call_node = visitor.visit_func_call(func_name, params)?;
+                Ok(Some(func_call_node))
+            }
+
+            Rule::number => {
+                let parse_node = parse_node.as_str().to_string();
+                let res = visitor
+                    .visit_number(parse_node)
+                    .unwrap_or_else(SyntaxNode::from);
+                Ok(Some(res))
+            }
+            Rule::linebreak => {
+                self.current_line += 1;
+                Ok(None)
+            }
+            Rule::COMMENT | Rule::WHITESPACE | Rule::EOI => Ok(None),
+            _ => {
+                log::warn!(
+                    "Unimplemented rule `{:?}`:\n{}. {}",
+                    parse_node.as_rule(),
+                    self.current_line,
+                    parse_node.as_str()
+                );
+                Ok(None)
             }
         }
-        Ok(SyntaxNode::Empty)
     }
 
     fn get_function_parts<'a>(

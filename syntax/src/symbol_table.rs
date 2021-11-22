@@ -64,6 +64,10 @@ impl SymbolTable {
         }
     }
 
+    pub fn get_symbol(&self, id: &SymbolId) -> Option<&Symbol> {
+        Some(&self.symbols.get(id)?.symbol)
+    }
+
     pub fn add_symbol(&mut self, symbol: Symbol, scope: SymbolScope) -> SymbolId {
         let id = SymbolId(self.id_count);
         let sym_type = symbol.symbol_type;

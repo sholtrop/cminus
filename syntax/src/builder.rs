@@ -1,6 +1,5 @@
 use std::collections::hash_map::Entry;
 
-use general::tree::ArenaTree;
 use lexical::{ParseTree, Rule};
 
 use crate::{
@@ -81,28 +80,46 @@ impl SyntaxBuilder {
         self.current_function = None;
     }
 
-    pub fn get_id(&self, name: &str) -> Option<SymbolId> {
-        todo!("Implement")
+    pub fn get_symbol_by_id(&self, id: SymbolId) -> Option<&Symbol> {
+        self.table.get_symbol(&id)
     }
 
-    pub fn get_symbol_by_id(id: SymbolId) -> Symbol {
-        todo!("Implement")
+    pub fn get_symbol_by_name(&self, name: &SymbolName) -> Option<&Symbol> {
+        let id = self.get_symbol_id(name)?;
+        let symbol = self.get_symbol_by_id(id).unwrap_or_else(|| {
+            panic!(
+                "SymbolId {:?} was found by the scope manager but was not in the symbol table",
+                id
+            )
+        });
+        Some(symbol)
     }
 
-    pub fn get_symbol_by_name(name: &SymbolName) -> Symbol {
-        todo!("Implement")
+    pub fn get_symbol_id(&self, name: &SymbolName) -> Option<SymbolId> {
+        self.scope_manager.get_symbol_id(name)
     }
 
     pub fn get_current_function(&self) -> Option<SymbolId> {
         self.current_function
     }
 
-    pub fn attach_root(&mut self, name: SymbolName, new_root: SyntaxNode) {
+    pub fn attach_root(
+        &mut self,
+        func_id: &SymbolId,
+        new_root: SyntaxNode,
+    ) -> Result<(), SyntaxBuilderError> {
+        let func_root = self.tree.functions.get_mut(func_id).ok_or_else(|| {
+            SyntaxBuilderError(format!(
+                "Cannot attach root: Function with id {:?} not found",
+                func_id
+            ))
+        })?;
+        func_root.tree = Some(new_root);
         todo!("Implement")
     }
 
-    pub fn get_parameters(&self, name: &str) -> Option<Vec<Symbol>> {
-        let id = self.get_id(name)?;
+    pub fn get_parameters(&self, name: &SymbolName) -> Option<Vec<Symbol>> {
+        let id = self.get_symbol_id(name)?;
         self.table.get_func_param_symbols(id)
     }
 

@@ -1,4 +1,3 @@
-use general::tree::ArenaTree;
 use std::{collections::HashMap, fmt};
 
 use crate::{
@@ -13,7 +12,7 @@ pub enum NodeChildren {
 
 pub struct FunctionRoot {
     pub name: SymbolName,
-    pub tree: Option<ArenaTree<SyntaxNode>>,
+    pub tree: Option<SyntaxNode>,
 }
 
 #[derive(Default)]
@@ -29,7 +28,7 @@ impl SyntaxTree {
     }
 
     pub fn get_root(&mut self, id: &SymbolId) -> Option<&mut SyntaxNode> {
-        self.functions.get_mut(id)?.tree.as_mut()?.get_root_mut()
+        self.functions.get_mut(id)?.tree.as_mut()
     }
 }
 

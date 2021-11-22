@@ -1,4 +1,4 @@
-#[derive(Clone, PartialEq, Eq, Hash, Copy)]
+#[derive(Clone, PartialEq, Eq, Hash, Copy, Debug)]
 pub struct SymbolId(pub usize);
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct SymbolName(pub String);
