@@ -34,7 +34,7 @@ void = { "void" }
 
 type_specifier = { "unsigned int" | "uint8_t" | "int8_t" | "int" | "unsigned" }
 
-formal_parameters = _{ parameter+ | void }
+formal_parameters = { parameter+ | void }
 
 var = { !type_specifier ~ (array_access | ident) }
 
@@ -44,7 +44,7 @@ compound_stmt = { "{" ~ statement_list ~ "}" }
 
 statement_list = _{ statement* }
 
-statement = _{ 
+statement = { 
     var_declaration 
     | compound_stmt 
     | return_stmt 

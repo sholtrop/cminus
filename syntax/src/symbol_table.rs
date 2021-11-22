@@ -2,29 +2,57 @@ use crate::{
     id::*,
     symbol::{Symbol, SymbolType},
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 #[derive(Clone, Copy)]
 pub enum SymbolScope {
-    Local { owning_function_id: SymbolId },
+    Local { owning_function: SymbolId },
     Global,
 }
 
+#[derive(Clone)]
 pub struct SymbolInfo {
     pub id: SymbolId,
     pub symbol_scope: SymbolScope,
     pub symbol: Symbol,
 }
 
+#[derive(Clone)]
 pub struct FunctionInfo {
     pub variables: Vec<SymbolId>,
     pub parameters: Vec<SymbolId>,
 }
 
+#[derive(Default, Clone)]
 pub struct SymbolTable {
     symbols: HashMap<SymbolId, SymbolInfo>,
     functions: HashMap<SymbolId, FunctionInfo>,
     id_count: usize,
+}
+
+impl fmt::Display for SymbolTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "###### Functions ######")?;
+        for (id, info) in self.functions.clone().into_iter() {
+            let SymbolInfo { symbol, .. } = self.symbols.get(&id).unwrap();
+            write!(f, "{} {} (", symbol.return_type, symbol.name)?;
+            if info.parameters.is_empty() {
+                write!(f, "void")?;
+            } else {
+                let mut param_iter = info.parameters.into_iter();
+                let first = param_iter.next().unwrap();
+                let SymbolInfo { symbol, .. } = self.symbols.get(&first).unwrap();
+                write!(f, "{} {}", symbol.return_type, symbol.name)?;
+                for param in param_iter {
+                    let SymbolInfo { symbol, .. } = self.symbols.get(&param).unwrap();
+                    write!(f, ", {} {}", symbol.return_type, symbol.name)?;
+                }
+            }
+            write!(f, ")")?;
+            writeln!(f)?;
+        }
+        Ok(())
+    }
 }
 
 impl SymbolTable {
@@ -48,7 +76,12 @@ impl SymbolTable {
             },
         );
 
-        if let SymbolScope::Local { owning_function_id } = scope {
+        // If the symbol we added is a parameter/variable belonging to a function,
+        // add it to the FunctionInfo.
+        if let SymbolScope::Local {
+            owning_function: owning_function_id,
+        } = scope
+        {
             let func_info = self
                 .functions
                 .get_mut(&owning_function_id)

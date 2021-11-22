@@ -1,14 +1,19 @@
-use std::collections::HashMap;
-
+use general::tree::ArenaTree;
 use lexical::{ParseNode, ParseTree};
+use std::borrow::{Borrow, BorrowMut};
+use std::cell::{RefCell, RefMut};
+use std::ops::DerefMut;
+use std::{collections::HashMap, rc::Rc};
 
+use crate::node::NodeType;
+use crate::syntax_tree::SyntaxTree;
 use crate::{
     builder::SyntaxBuilder,
     error::SyntaxBuilderError,
-    id::SymbolName,
-    symbol::{ReturnType, Symbol},
+    id::{SymbolId, SymbolName},
+    node::SyntaxNode,
+    symbol::{ReturnType, Symbol, SymbolType},
     symbol_table::SymbolTable,
-    syntax_tree::SyntaxTree,
 };
 
 pub struct SyntaxResult {
@@ -18,12 +23,14 @@ pub struct SyntaxResult {
 
 pub struct Visitor {
     builder: SyntaxBuilder,
+    statement_list: Vec<SyntaxNode>,
 }
 
 impl Visitor {
     pub fn new() -> Self {
         Self {
             builder: SyntaxBuilder::new(),
+            statement_list: vec![],
         }
     }
 
@@ -35,7 +42,6 @@ impl Visitor {
 
     pub fn program_start(&mut self) {
         self.builder.add_builtins();
-        // self.builder.scope_manager.
     }
 
     pub fn visit_func_start(
@@ -46,19 +52,75 @@ impl Visitor {
         self.builder.enter_function(name, return_type).and(Ok(()))
     }
 
-    // pub fn visit_parameters(&mut self) {
+    pub fn visit_param_decl(
+        &mut self,
+        name: SymbolName,
+        return_type: ReturnType,
+        line: usize,
+    ) -> Result<SymbolId, SyntaxBuilderError> {
+        self.builder.add_symbol(Symbol {
+            name,
+            return_type,
+            symbol_type: SymbolType::Parameter,
+            line,
+        })
+    }
 
-    //     // let variables = variables
-    //     //     .into_iter()
-    //     //     .map(|var| self.add_symbol(var, scope))
-    //     //     .collect();
-    //     let parameters = parameters
-    //         .into_iter()
-    //         .map(|param| self.add_symbol(param, scope))
-    //         .collect();
-    // }
+    pub fn visit_var_decl(
+        &mut self,
+        name: SymbolName,
+        return_type: ReturnType,
+        line: usize,
+    ) -> Result<SymbolId, SyntaxBuilderError> {
+        self.builder.add_symbol(Symbol {
+            name,
+            return_type,
+            symbol_type: SymbolType::Variable,
+            line,
+        })
+    }
 
-    pub fn visit_func_end(&mut self) {
+    pub fn visit_func_end(&mut self, name: SymbolName, root: SyntaxNode) {
+        self.builder.attach_root(name, root);
         self.builder.leave_function();
+    }
+
+    pub fn add_local_scope(&mut self) {
+        self.builder.enter_new_scope()
+    }
+
+    pub fn leave_local_scope(&mut self) {
+        self.builder.leave_scope()
+    }
+
+    pub fn visit_statement(&mut self, node: SyntaxNode) {
+        self.statement_list.push(node);
+        // match stmt_list {
+        //     ListTree {
+        //         current: None,
+        //         root: None,
+        //     } => {
+        //         stmt_list.root = Some(node);
+        //         stmt_list.current = Some(stmt_list.root.as_ref().unwrap().borrow_mut());
+        //     }
+        //     ListTree {
+        //         current: Some(current),
+        //         root: Some(_),
+        //     } => {
+        //         // current.replace(Node::Binary {
+        //         //     node_type: NodeType::StatementList,
+        //         //     left: node,
+        //         //     right:
+        //         // });
+        //     }
+        //     ListTree {
+        //         current: None,
+        //         root: Some(_),
+        //     } => panic!("Invariant violated: `current` is None while `root` is Some"),
+        //     ListTree {
+        //         current: Some(_),
+        //         root: None,
+        //     } => panic!("Invariant violated: `root` is None while `current` is Some"),
+        // }
     }
 }

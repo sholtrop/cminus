@@ -1,11 +1,12 @@
 use std::collections::hash_map::Entry;
 
+use general::tree::ArenaTree;
 use lexical::{ParseTree, Rule};
 
 use crate::{
     error::SyntaxBuilderError,
     id::{SymbolId, SymbolName},
-    node::{Node, NodeType},
+    node::{NodeType, SyntaxNode},
     scope::{Scope, ScopeManager},
     symbol::{ReturnType, Symbol, SymbolType},
     symbol_table::{SymbolScope, SymbolTable},
@@ -70,23 +71,14 @@ impl SyntaxBuilder {
             line: self.current_line,
         })?;
         self.current_function = Some(id);
-        self.tree.functions.insert(
-            id,
-            FunctionRoot {
-                name,
-                root: Some(Node::Unary {
-                    child: None,
-                    node_type: NodeType::StatementList,
-                    return_type,
-                }),
-            },
-        );
-        self.scope_manager.enter_new_scope();
+        self.tree
+            .functions
+            .insert(id, FunctionRoot { name, tree: None });
         Ok(id)
     }
 
     pub fn leave_function(&mut self) {
-        self.scope_manager.leave_scope();
+        self.current_function = None;
     }
 
     pub fn get_id(&self, name: &str) -> Option<SymbolId> {
@@ -105,7 +97,7 @@ impl SyntaxBuilder {
         self.current_function
     }
 
-    pub fn attach_root(name: SymbolName, new_root: Node) {
+    pub fn attach_root(&mut self, name: SymbolName, new_root: SyntaxNode) {
         todo!("Implement")
     }
 
@@ -122,11 +114,19 @@ impl SyntaxBuilder {
         }
         let scope = if let Some(id) = self.current_function {
             SymbolScope::Local {
-                owning_function_id: id,
+                owning_function: id,
             }
         } else {
             SymbolScope::Global
         };
         Ok(self.table.add_symbol(symbol, scope))
+    }
+
+    pub fn enter_new_scope(&mut self) {
+        self.scope_manager.enter_new_scope()
+    }
+
+    pub fn leave_scope(&mut self) {
+        self.scope_manager.leave_scope()
     }
 }

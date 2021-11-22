@@ -1,10 +1,9 @@
+use general::tree::{ChildPosition, TreeIndex};
+
 use crate::symbol::ReturnType;
 use core::fmt;
-use ptree::TreeItem;
-use std::ops::Deref;
-use std::{borrow::Cow, vec};
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum NodeType {
     Unknown,
     Error,
@@ -93,7 +92,7 @@ impl fmt::Display for NodeType {
     }
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum ConstantNodeValue {
     Uint8(u8),
     Int8(i8),
@@ -116,18 +115,18 @@ impl fmt::Display for ConstantNodeValue {
     }
 }
 
-#[derive(PartialEq, Clone)]
-pub enum Node {
+#[derive(PartialEq, Clone, Debug)]
+pub enum SyntaxNode {
     Unary {
         node_type: NodeType,
         return_type: ReturnType,
-        child: Option<Box<Node>>,
+        child: Option<TreeIndex>,
     },
     Binary {
         node_type: NodeType,
         return_type: ReturnType,
-        left: Option<Box<Node>>,
-        right: Option<Box<Node>>,
+        left: Option<TreeIndex>,
+        right: Option<TreeIndex>,
     },
     Constant {
         node_type: NodeType,
@@ -142,54 +141,66 @@ pub enum Node {
     Empty,
 }
 
-impl TreeItem for Node {
-    type Child = Self;
-    fn write_self<W: std::io::Write>(&self, f: &mut W, _: &ptree::Style) -> std::io::Result<()> {
+impl general::tree::TreeItem for SyntaxNode {
+    fn get_child(&self, pos: &general::tree::ChildPosition) -> Option<general::tree::TreeIndex> {
         match self {
-            Self::Unary {
-                node_type,
-                return_type,
-                ..
-            } => write!(f, "Unary[{} - {}]", node_type, return_type),
-            Self::Binary {
-                node_type,
-                return_type,
-                ..
-            } => write!(f, "Bin[{} - {}]", node_type, return_type),
-            Self::Constant {
-                node_type, value, ..
-            } => write!(f, "Const[{} - {}]", node_type, value),
-            Self::Symbol {
-                node_type,
-                symbol_id,
-                ..
-            } => write!(f, "Sym[{} - ID:{}]", node_type, symbol_id),
-            Self::Empty => write!(f, "[EMPTY]"),
+            &Self::Binary { left, right, .. } => {
+                if let ChildPosition::Left = pos {
+                    left
+                } else {
+                    right
+                }
+            }
+            &Self::Unary { child, .. } => child,
+            _ => {
+                panic!("Cannot get child of SyntaxNode {:?}", self)
+            }
         }
     }
 
-    fn children(&self) -> Cow<[Self::Child]> {
-        match self {
-            Self::Unary { child, .. } => {
-                if let Some(node) = child {
-                    Cow::from(vec![node.deref().clone()])
+    fn set_child(
+        &mut self,
+        pos: &general::tree::ChildPosition,
+        new_child: general::tree::TreeIndex,
+    ) -> Option<general::tree::TreeIndex> {
+        match *self {
+            Self::Binary {
+                ref mut left,
+                ref mut right,
+                ..
+            } => {
+                let old: Option<TreeIndex>;
+                if let ChildPosition::Left = pos {
+                    old = *left;
+                    *left = Some(new_child);
                 } else {
-                    Cow::from(vec![])
+                    old = *right;
+                    *right = Some(new_child);
                 }
+                old
             }
-            Self::Binary { left, right, .. } => {
-                let mut vec: Vec<Node> = vec![];
-                if let Some(node) = left {
-                    vec.push(node.deref().clone());
-                }
-                if let Some(node) = right {
-                    vec.push(node.deref().clone());
-                }
-                Cow::from(vec)
+            Self::Unary { ref mut child, .. } => {
+                let old = *child;
+                *child = Some(new_child);
+                old
             }
-            Self::Constant { .. } => Cow::from(vec![]),
-            Self::Symbol { .. } => Cow::from(vec![]),
-            Self::Empty => Cow::from(vec![]),
+            _ => panic!("Cannot set child of SyntaxNode {:?}", self),
         }
+    }
+}
+
+impl fmt::Display for SyntaxNode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                SyntaxNode::Binary { node_type, .. } => node_type.to_string(),
+                SyntaxNode::Constant { node_type, .. } => node_type.to_string(),
+                SyntaxNode::Empty => "Empty".to_string(),
+                SyntaxNode::Symbol { node_type, .. } => node_type.to_string(),
+                SyntaxNode::Unary { node_type, .. } => node_type.to_string(),
+            }
+        )
     }
 }

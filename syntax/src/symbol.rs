@@ -2,7 +2,7 @@ use core::fmt;
 
 use crate::id::SymbolName;
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum ReturnType {
     Unknown,
     Error,
@@ -67,7 +67,7 @@ impl ReturnType {
     }
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub enum SymbolType {
     Unknown,
     Error,
