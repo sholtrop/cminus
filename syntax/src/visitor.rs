@@ -104,9 +104,7 @@ impl Visitor {
             let actual_args = actual_args.drain(..);
             for pair in actual_args.zip_longest(formal_args) {
                 if let EitherOrBoth::Both(actual_arg, formal_arg) = pair {
-                    
-                }
-                else {
+                } else {
                     panic!("create an error")
                 }
             }
@@ -178,6 +176,4 @@ impl Visitor {
         }
         Ok(stmt_list)
     }
-
-    pub fn visit_coercion
 }
