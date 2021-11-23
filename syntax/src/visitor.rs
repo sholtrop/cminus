@@ -103,10 +103,22 @@ impl Visitor {
             let formal_args = self.builder.get_parameters(&id)?.into_iter();
             let actual_args = actual_args.drain(..);
             for pair in actual_args.zip_longest(formal_args) {
-                if let EitherOrBoth::Both(actual_arg, formal_arg) = pair {
-                } else {
-                    panic!("create an error")
-                }
+                match pair {
+                    EitherOrBoth::Both(actual_arg, formal_arg) => {
+                        if actual_arg.return_type() != formal_arg.return_type {
+                            let coercion =
+                                SyntaxNode::try_coerce(actual_arg, formal_arg.return_type);
+                        }
+                    }
+                    EitherOrBoth::Left(actual_arg) => Err(SyntaxBuilderError::from(format!(
+                        "Too many arguments for function {}",
+                        func.name
+                    ))),
+                    EitherOrBoth::Right(formal_arg) => Err(SyntaxBuilderError::from(format!(
+                        "Too few arguments for function {}. Expected argument `{}`.",
+                        func.name, formal_arg.name
+                    ))),
+                }?;
             }
             Ok(SyntaxNode::Empty)
         } else {

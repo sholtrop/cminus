@@ -153,6 +153,46 @@ impl SyntaxNode {
             value: ConstantNodeValue::ErrorMessage(err.to_string()),
         }
     }
+
+    /// Attempt to coerce [SyntaxNode] `from` to [ReturnType] `to`
+    /// Yields a [SyntaxNode] with the coerced value if the coercion is valid, or an error node otherwise.
+    pub fn try_coerce(from: SyntaxNode, to: ReturnType) -> Result<SyntaxNode, SyntaxNode> {
+        let from = from.return_type();
+        let coercion_node_ret = ReturnType::Error;
+        // ReturnTypes have a partial ordering for coercion
+        if to < from {
+            Ok(SyntaxNode::Unary {
+                child: None,
+                return_type: to,
+                node_type: NodeType::Coercion,
+            })
+        } else {
+            Err(SyntaxNode::create_error(format!(
+                "Cannot coerce {} to {}",
+                from, to
+            )))
+        }
+    }
+
+    pub fn return_type(&self) -> ReturnType {
+        match *self {
+            SyntaxNode::Unary { return_type, .. }
+            | SyntaxNode::Binary { return_type, .. }
+            | SyntaxNode::Constant { return_type, .. }
+            | SyntaxNode::Symbol { return_type, .. } => return_type,
+            SyntaxNode::Empty => ReturnType::Error,
+        }
+    }
+
+    pub fn node_type(&self) -> NodeType {
+        match *self {
+            SyntaxNode::Unary { node_type, .. }
+            | SyntaxNode::Binary { node_type, .. }
+            | SyntaxNode::Constant { node_type, .. }
+            | SyntaxNode::Symbol { node_type, .. } => node_type,
+            SyntaxNode::Empty => NodeType::Error,
+        }
+    }
 }
 
 impl fmt::Display for SyntaxNode {

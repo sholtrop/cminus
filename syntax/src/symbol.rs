@@ -1,8 +1,8 @@
-use core::fmt;
-
 use crate::id::SymbolName;
+use core::fmt;
+use std::convert::From;
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug, Hash)]
 pub enum ReturnType {
     Unknown,
     Error,
@@ -18,6 +18,42 @@ pub enum ReturnType {
     Real,
     Bool,
 }
+
+impl From<&ReturnType> for usize {
+    fn from(ret: &ReturnType) -> Self {
+        match ret {
+            ReturnType::Bool => 1,
+            ReturnType::Int8 => 2,
+            ReturnType::Uint8 => 3,
+            ReturnType::Int => 4,
+            ReturnType::Uint => 5,
+            _ => 6, // Other types cannot be coerced
+        }
+    }
+}
+
+impl PartialOrd for ReturnType {
+    /// Defines a partial ordering for the purpose of type coercion as follows:
+    /// Coercions are allowed:
+    /// ```
+    /// From      To
+    /// UINT      BOOL
+    /// INT       UINT, BOOL
+    /// UINT8     INT, UINT, BOOL
+    /// INT8      UINT8, INT, UINT, BOOL
+    /// BOOL      INT8, UINT8, INT, UINT
+    /// ```
+    /// If `a` < `b` then `a` can be coerced to `b`
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let order_left: usize = self.into();
+        let order_right: usize = other.into();
+        order_left.partial_cmp(&order_right)
+
+        // Some(Ordering::Equal)
+        // let idx_self = order.
+    }
+}
+
 impl fmt::Display for ReturnType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
