@@ -1,3 +1,4 @@
+use itertools::{EitherOrBoth, Itertools};
 use lexical::{ParseNode, ParseTree};
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{RefCell, RefMut};
@@ -92,14 +93,30 @@ impl Visitor {
 
     pub fn visit_func_call(
         &mut self,
-        name: SymbolName,
-        args: Vec<SyntaxNode>,
+        name: &SymbolName,
+        mut actual_args: Vec<SyntaxNode>,
     ) -> Result<SyntaxNode, SyntaxBuilderError> {
-        // let func_id = self.builder.get_symbol_id(name);
-        // let node = SyntaxNode::Binary {
-        //     node_type: NodeType::FunctionCall,
-        //     return_type: ReturnType::
-        // }
+        let (func, id) = self.builder.get_symbol_by_name(name).ok_or_else(|| {
+            SyntaxBuilderError::from(format!("Cannot find function with name `{}`", name))
+        })?;
+        if let SymbolType::Function = func.symbol_type {
+            let formal_args = self.builder.get_parameters(&id)?.into_iter();
+            let actual_args = actual_args.drain(..);
+            for pair in actual_args.zip_longest(formal_args) {
+                if let EitherOrBoth::Both(actual_arg, formal_arg) = pair {
+                    
+                }
+                else {
+                    panic!("create an error")
+                }
+            }
+            Ok(SyntaxNode::Empty)
+        } else {
+            Err(SyntaxBuilderError::from(format!(
+                "Symbol `{}` is not a function",
+                name
+            )))
+        }?;
         todo!("func_call: Weave collected expression SyntaxNodes together in a expression list")
     }
 
@@ -161,4 +178,6 @@ impl Visitor {
         }
         Ok(stmt_list)
     }
+
+    pub fn visit_coercion
 }

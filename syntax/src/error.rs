@@ -27,4 +27,10 @@ impl From<&str> for SyntaxBuilderError {
     }
 }
 
+impl From<String> for SyntaxBuilderError {
+    fn from(input: String) -> Self {
+        Self(input)
+    }
+}
+
 impl Error for SyntaxBuilderError {}

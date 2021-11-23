@@ -84,7 +84,7 @@ impl SyntaxBuilder {
         self.table.get_symbol(&id)
     }
 
-    pub fn get_symbol_by_name(&self, name: &SymbolName) -> Option<&Symbol> {
+    pub fn get_symbol_by_name(&self, name: &SymbolName) -> Option<(&Symbol, SymbolId)> {
         let id = self.get_symbol_id(name)?;
         let symbol = self.get_symbol_by_id(id).unwrap_or_else(|| {
             panic!(
@@ -92,7 +92,7 @@ impl SyntaxBuilder {
                 id
             )
         });
-        Some(symbol)
+        Some((symbol, id))
     }
 
     pub fn get_symbol_id(&self, name: &SymbolName) -> Option<SymbolId> {
@@ -118,9 +118,10 @@ impl SyntaxBuilder {
         todo!("Implement")
     }
 
-    pub fn get_parameters(&self, name: &SymbolName) -> Option<Vec<Symbol>> {
-        let id = self.get_symbol_id(name)?;
-        self.table.get_func_param_symbols(id)
+    pub fn get_parameters(&self, id: &SymbolId) -> Result<Vec<Symbol>, SyntaxBuilderError> {
+        self.table.get_func_param_symbols(id).ok_or_else(|| {
+            SyntaxBuilderError(format!("Symbol with id {} not found in function table", id))
+        })
     }
 
     pub fn add_symbol(&mut self, symbol: Symbol) -> Result<SymbolId, SyntaxBuilderError> {

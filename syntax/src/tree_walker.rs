@@ -99,7 +99,7 @@ impl TreeWalker {
                             })
                     })
                     .collect();
-                let func_call_node = visitor.visit_func_call(func_name, params)?;
+                let func_call_node = visitor.visit_func_call(&func_name, params)?;
                 Ok(Some(func_call_node))
             }
 

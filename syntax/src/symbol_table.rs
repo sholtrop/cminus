@@ -118,11 +118,11 @@ impl SymbolTable {
         id
     }
 
-    pub fn get_func_param_ids(&self, func_id: SymbolId) -> Option<&Vec<SymbolId>> {
-        Some(&self.functions.get(&func_id)?.parameters)
+    pub fn get_func_param_ids(&self, func_id: &SymbolId) -> Option<&Vec<SymbolId>> {
+        Some(&self.functions.get(func_id)?.parameters)
     }
 
-    pub fn get_func_param_symbols(&self, func_id: SymbolId) -> Option<Vec<Symbol>> {
+    pub fn get_func_param_symbols(&self, func_id: &SymbolId) -> Option<Vec<Symbol>> {
         let mut symbols = Vec::new();
         for id in self.get_func_param_ids(func_id)? {
             symbols.push(self.symbols.get(id)?.symbol.clone());
