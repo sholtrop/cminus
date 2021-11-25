@@ -2,6 +2,7 @@ use itertools::{EitherOrBoth, Itertools};
 use lexical::{ParseNode, ParseTree};
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{RefCell, RefMut};
+use std::cmp::Ordering;
 use std::ops::DerefMut;
 use std::{collections::HashMap, rc::Rc};
 
@@ -36,18 +37,43 @@ impl Visitor {
         self.builder.result()
     }
 
-    fn add_builtins(&mut self) {}
+    fn add_builtins(&mut self) {
+        let id = self
+            .visit_func_start(Symbol {
+                name: SymbolName::from("writeinteger"),
+                return_type: ReturnType::Void,
+                symbol_type: SymbolType::Function,
+                line: 0,
+            })
+            .expect("Error adding builtins: Function `writeinteger` start");
+        self.add_local_scope();
+        self.visit_param_decl(SymbolName::from("i"), ReturnType::Int, 0)
+            .expect("Error adding builtins: Param `i` for `writeinteger`");
+        self.leave_local_scope();
+        self.visit_func_end(&id, SyntaxNode::Empty)
+            .expect("Error adding builtins: Function `writeinteger` end");
+
+        let id = self
+            .visit_func_start(Symbol {
+                name: SymbolName::from("readinteger"),
+                return_type: ReturnType::Int,
+                symbol_type: SymbolType::Function,
+                line: 0,
+            })
+            .expect("Error adding builtins: Function `readinteger` start");
+        self.visit_func_end(&id, SyntaxNode::Empty)
+            .expect("Error adding builtins: Function `readinteger` end");
+    }
 
     pub fn program_start(&mut self) {
-        self.builder.add_builtins();
+        self.add_builtins();
     }
 
     pub fn visit_func_start(
         &mut self,
-        name: SymbolName,
-        return_type: ReturnType,
+        func_symbol: Symbol,
     ) -> Result<SymbolId, SyntaxBuilderError> {
-        self.builder.enter_function(name, return_type)
+        self.builder.enter_function(func_symbol)
     }
 
     pub fn visit_param_decl(
@@ -78,9 +104,14 @@ impl Visitor {
         })
     }
 
-    pub fn visit_func_end(&mut self, id: &SymbolId, root: SyntaxNode) {
-        self.builder.attach_root(id, root);
+    pub fn visit_func_end(
+        &mut self,
+        id: &SymbolId,
+        root: SyntaxNode,
+    ) -> Result<(), SyntaxBuilderError> {
+        self.builder.attach_root(id, root)?;
         self.builder.leave_function();
+        Ok(())
     }
 
     pub fn add_local_scope(&mut self) {
@@ -99,35 +130,62 @@ impl Visitor {
         let (func, id) = self.builder.get_symbol_by_name(name).ok_or_else(|| {
             SyntaxBuilderError::from(format!("Cannot find function with name `{}`", name))
         })?;
+
+        let mut current_node: Option<SyntaxNode> = None;
+
         if let SymbolType::Function = func.symbol_type {
             let formal_args = self.builder.get_parameters(&id)?.into_iter();
-            let actual_args = actual_args.drain(..);
-            for pair in actual_args.zip_longest(formal_args) {
-                match pair {
-                    EitherOrBoth::Both(actual_arg, formal_arg) => {
-                        if actual_arg.return_type() != formal_arg.return_type {
-                            let coercion =
-                                SyntaxNode::try_coerce(actual_arg, formal_arg.return_type);
-                        }
+            let actual_args = actual_args.into_iter();
+            let n_formal_args = formal_args.len();
+            let n_actual_args = actual_args.len();
+            match n_actual_args.cmp(&n_formal_args) {
+                Ordering::Greater => {
+                    return Err(SyntaxBuilderError(format!(
+                        "Too many arguments for function {}. Expected {}, got {}",
+                        func.name, n_formal_args, n_actual_args
+                    )))
+                }
+                Ordering::Less => {
+                    return Err(SyntaxBuilderError(format!(
+                        "Too few arguments for function {}. Expected {}, got {}",
+                        func.name, n_formal_args, n_actual_args
+                    )))
+                }
+                _ => {}
+            };
+
+            for pair in actual_args.zip_longest(formal_args).rev() {
+                if let EitherOrBoth::Both(mut actual_arg, formal_arg) = pair {
+                    if actual_arg.return_type() != formal_arg.return_type {
+                        actual_arg = SyntaxNode::coerce(actual_arg, formal_arg.return_type)
+                            .unwrap_or_else(SyntaxNode::from);
                     }
-                    EitherOrBoth::Left(actual_arg) => Err(SyntaxBuilderError::from(format!(
-                        "Too many arguments for function {}",
-                        func.name
-                    ))),
-                    EitherOrBoth::Right(formal_arg) => Err(SyntaxBuilderError::from(format!(
-                        "Too few arguments for function {}. Expected argument `{}`.",
-                        func.name, formal_arg.name
-                    ))),
-                }?;
+
+                    current_node = Some(SyntaxNode::Binary {
+                        node_type: NodeType::ExpressionList,
+                        return_type: ReturnType::Void,
+                        left: Some(Box::new(actual_arg)),
+                        right: current_node.map(Box::new),
+                    });
+                }
             }
-            Ok(SyntaxNode::Empty)
         } else {
-            Err(SyntaxBuilderError::from(format!(
+            return Err(SyntaxBuilderError(format!(
                 "Symbol `{}` is not a function",
                 name
-            )))
-        }?;
-        todo!("func_call: Weave collected expression SyntaxNodes together in a expression list")
+            )));
+        };
+        let func_node = SyntaxNode::Binary {
+            left: Some(Box::new(SyntaxNode::Symbol {
+                node_type: NodeType::Id,
+                return_type: ReturnType::Void,
+                symbol_id: id,
+            })),
+            right: current_node.map(Box::new),
+            node_type: NodeType::FunctionCall,
+            return_type: func.return_type.clone(),
+        };
+        Ok(func_node)
     }
 
     pub fn visit_number(&mut self, number: String) -> Result<SyntaxNode, SyntaxBuilderError> {
@@ -164,28 +222,56 @@ impl Visitor {
     }
 
     /// Take a `list` of [SyntaxNode]s and weave them together by making them the left child of a StatementList and linking the StatementLists.
-    pub fn visit_statement_list(
-        &mut self,
-        mut list: Vec<SyntaxNode>,
-    ) -> Result<SyntaxNode, SyntaxBuilderError> {
-        let mut iter = list.drain(..).rev();
-        let first = iter
-            .next()
-            .ok_or_else(|| SyntaxBuilderError::from("Expected at least one item in `list`"))?;
-        let mut stmt_list = SyntaxNode::Binary {
-            left: Some(Box::new(first)),
-            right: None,
-            node_type: NodeType::StatementList,
-            return_type: ReturnType::Void,
-        };
-        for node in iter {
-            stmt_list = SyntaxNode::Binary {
+    pub fn visit_statement_list(&mut self, list: Vec<SyntaxNode>) -> SyntaxNode {
+        let mut stmt_list: Option<SyntaxNode> = None;
+
+        for node in list.into_iter().rev() {
+            stmt_list = Some(SyntaxNode::Binary {
                 left: Some(Box::new(node)),
-                right: Some(Box::new(stmt_list)),
+                right: stmt_list.map(Box::new),
                 node_type: NodeType::StatementList,
                 return_type: ReturnType::Void,
-            }
+            });
         }
-        Ok(stmt_list)
+        stmt_list.unwrap_or(SyntaxNode::Empty)
+    }
+
+    pub fn visit_return(&mut self, ret_node: SyntaxNode) -> SyntaxNode {
+        SyntaxNode::Unary {
+            node_type: NodeType::Return,
+            return_type: ret_node.return_type(),
+            child: Some(Box::new(ret_node)),
+        }
+    }
+
+    pub fn visit_assignment(
+        &mut self,
+        lvar: SymbolName,
+        mut exp: SyntaxNode,
+    ) -> Result<SyntaxNode, SyntaxBuilderError> {
+        let (symbol, id) = self.builder.get_symbol_by_name(&lvar).ok_or_else(|| {
+            SyntaxBuilderError(format!(
+                "Variable {} does not exist in the current scope",
+                lvar
+            ))
+        })?;
+        let ret_type = symbol.return_type;
+
+        if exp.return_type() != ret_type {
+            exp = SyntaxNode::coerce(exp, ret_type)?;
+        }
+        let id = SyntaxNode::Symbol {
+            node_type: NodeType::Id,
+            return_type: ret_type,
+            symbol_id: id,
+        };
+        let node = SyntaxNode::Binary {
+            node_type: NodeType::Assignment,
+            return_type: ret_type,
+            left: Some(Box::new(id)),
+            right: Some(Box::new(exp)),
+        };
+
+        Ok(node)
     }
 }

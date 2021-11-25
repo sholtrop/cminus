@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = std::fs::read_to_string("test.c")?;
     let parse_tree = lexical::parse(&input)?;
     let res = syntax::generate(parse_tree)?;
-    log::info!("{}", res.symbol_table);
-    log::info!("{}", res.tree);
+    log::info!("\n{}", res.symbol_table);
+    log::info!("\n{}", res.tree);
     Ok(())
 }

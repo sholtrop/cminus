@@ -1,4 +1,10 @@
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt,
+    io::{BufReader, BufWriter},
+};
+
+use ptree::PrintConfig;
 
 use crate::{
     id::{SymbolId, SymbolName},
@@ -37,6 +43,17 @@ impl fmt::Display for SyntaxTree {
         for func in self.functions.values() {
             writeln!(f, "function `{}`", func.name)?;
             if let Some(tree) = &func.tree {
+                let mut buff = vec![];
+                ptree::write_tree_with(
+                    tree,
+                    &mut buff,
+                    &PrintConfig {
+                        indent: 5,
+                        ..Default::default()
+                    },
+                )
+                .expect("Error printing tree");
+                let tree = String::from_utf8(buff).expect("Utf8 error printing tree");
                 writeln!(f, "{}", tree)?;
             } else {
                 writeln!(f, "<no root yet>")?;

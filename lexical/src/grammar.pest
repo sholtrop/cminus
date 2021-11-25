@@ -1,16 +1,16 @@
 
 program = _{ SOI ~ declaration_list ~ EOI}
 
-alpha = { 'a'..'z' | 'A'..'Z' }
-digit = { '0'..'9' }
+alpha = _{ 'a'..'z' | 'A'..'Z' }
+digit = _{ '0'..'9' }
 
-ident = { !keyword ~ ((alpha | "_") ~ (alpha | digit | "_")*) }
+ident = @{ !keyword ~ ((alpha | "_") ~ (alpha | digit | "_")*) }
 
-number = { digit+ }
+number = @{ digit+ }
 
 linebreak = _{ "\r" | "\n" }
 
-WHITESPACE = _{ " " | "\t" | linebreak }
+WHITESPACE = { " " | "\t" | linebreak }
 
 COMMENT = { "//" ~ (!linebreak ~ ANY)* ~ linebreak? | "/*" ~ (!"*/" ~ ANY)* ~ "*/" }	
 
@@ -24,7 +24,7 @@ var_declaration = { type_specifier ~ var_decl_list ~ ";" }
 
 var_decl_list = { any_var_decl ~ ("," ~ any_var_decl)* }
 
-any_var_decl = { array_decl | var_decl_maybe_init }
+any_var_decl = _{ array_decl | var_decl_maybe_init }
 
 var_decl_maybe_init = { ident ~ ("=" ~ expression)? }
 
@@ -58,9 +58,11 @@ expression_stmt = _{ expression ~ ";" | ";" }
 
 decl_list = _{ var_declaration+ }
 
-expression = _{ assignment_expression }
+expression = { assignment_expression }
 
-assignment_expression = _{ var ~ "=" ~ expression | bool_expression }
+assignment_expression = _{ var ~ assign_op ~ expression | bool_expression }
+
+assign_op = { "=" }
 
 bool_expression = _{ rel_expression ~ (bool_op ~ bool_expression)* }
 

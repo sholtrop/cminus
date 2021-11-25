@@ -81,7 +81,7 @@ impl fmt::Display for NodeType {
                 NodeType::Mod => "mod",
                 NodeType::And => "and",
                 NodeType::Num => "num",
-                NodeType::Id => "id",
+                NodeType::Id => "sym_id",
                 NodeType::Empty => "empty",
                 NodeType::Not => "not",
                 NodeType::SignPlus => "sign_plus",
@@ -155,41 +155,40 @@ impl SyntaxNode {
     }
 
     /// Attempt to coerce [SyntaxNode] `from` to [ReturnType] `to`
-    /// Yields a [SyntaxNode] with the coerced value if the coercion is valid, or an error node otherwise.
-    pub fn try_coerce(from: SyntaxNode, to: ReturnType) -> Result<SyntaxNode, SyntaxNode> {
-        let from = from.return_type();
-        let coercion_node_ret = ReturnType::Error;
-        // ReturnTypes have a partial ordering for coercion
-        if to < from {
+    /// If the coercion is valid, will return a unary coercion [SyntaxNode] with the `from` node as its child.
+    pub fn coerce(from: SyntaxNode, to: ReturnType) -> Result<SyntaxNode, SyntaxBuilderError> {
+        let from_ret_t = from.return_type();
+        // ReturnTypes have a defined partial ordering for coercion
+        if from_ret_t < to {
             Ok(SyntaxNode::Unary {
-                child: None,
+                child: Some(Box::new(from)),
                 return_type: to,
                 node_type: NodeType::Coercion,
             })
         } else {
-            Err(SyntaxNode::create_error(format!(
+            Err(SyntaxBuilderError(format!(
                 "Cannot coerce {} to {}",
-                from, to
+                from_ret_t, to
             )))
         }
     }
 
     pub fn return_type(&self) -> ReturnType {
-        match *self {
+        match self {
             SyntaxNode::Unary { return_type, .. }
             | SyntaxNode::Binary { return_type, .. }
             | SyntaxNode::Constant { return_type, .. }
-            | SyntaxNode::Symbol { return_type, .. } => return_type,
+            | SyntaxNode::Symbol { return_type, .. } => return_type.clone(),
             SyntaxNode::Empty => ReturnType::Error,
         }
     }
 
     pub fn node_type(&self) -> NodeType {
-        match *self {
+        match self {
             SyntaxNode::Unary { node_type, .. }
             | SyntaxNode::Binary { node_type, .. }
             | SyntaxNode::Constant { node_type, .. }
-            | SyntaxNode::Symbol { node_type, .. } => node_type,
+            | SyntaxNode::Symbol { node_type, .. } => node_type.clone(),
             SyntaxNode::Empty => NodeType::Error,
         }
     }
@@ -197,21 +196,23 @@ impl SyntaxNode {
 
 impl fmt::Display for SyntaxNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                SyntaxNode::Binary { node_type, .. } => node_type.to_string(),
-                SyntaxNode::Constant { node_type, .. } => node_type.to_string(),
-                SyntaxNode::Empty => "Empty".to_string(),
-                SyntaxNode::Symbol { node_type, .. } => node_type.to_string(),
-                SyntaxNode::Unary { node_type, .. } => node_type.to_string(),
+        match self {
+            SyntaxNode::Binary { node_type, .. } => {
+                writeln!(f, "bin:{}", node_type.to_string())
             }
-        )
+            SyntaxNode::Constant { node_type, .. } => {
+                writeln!(f, "const:{}", node_type.to_string())
+            }
+            SyntaxNode::Empty => writeln!(f, "Empty"),
+            SyntaxNode::Symbol { node_type, .. } => {
+                writeln!(f, "sym:{}", node_type.to_string())
+            }
+            SyntaxNode::Unary { node_type, .. } => writeln!(f, "un:{}", node_type.to_string()),
+        }
     }
 }
 
-impl TreeItem for SyntaxNode {
+impl ptree::TreeItem for SyntaxNode {
     type Child = Self;
     fn write_self<W: std::io::Write>(&self, f: &mut W, _: &ptree::Style) -> std::io::Result<()> {
         match self {
@@ -219,20 +220,20 @@ impl TreeItem for SyntaxNode {
                 node_type,
                 return_type,
                 ..
-            } => write!(f, "Unary[{} - {}]", node_type, return_type),
+            } => write!(f, "{} - {}", node_type, return_type),
             Self::Binary {
                 node_type,
                 return_type,
                 ..
-            } => write!(f, "Bin[{} - {}]", node_type, return_type),
+            } => write!(f, "{} - {}", node_type, return_type),
             Self::Constant {
                 node_type, value, ..
-            } => write!(f, "Const[{} - {}]", node_type, value),
+            } => write!(f, "{} - {}", node_type, value),
             Self::Symbol {
                 node_type,
                 symbol_id,
                 ..
-            } => write!(f, "Sym[{} - ID:{:?}]", node_type, symbol_id),
+            } => write!(f, "{} - Sym:{}", node_type, symbol_id),
             Self::Empty => write!(f, "[EMPTY]"),
         }
     }

@@ -2,7 +2,7 @@ use crate::id::SymbolName;
 use core::fmt;
 use std::convert::From;
 
-#[derive(PartialEq, Eq, Clone, Debug, Hash)]
+#[derive(PartialEq, Eq, Clone, Debug, Hash, Copy)]
 pub enum ReturnType {
     Unknown,
     Error,
@@ -22,6 +22,7 @@ pub enum ReturnType {
 impl From<&ReturnType> for usize {
     fn from(ret: &ReturnType) -> Self {
         match ret {
+            ReturnType::Error => 0,
             ReturnType::Bool => 1,
             ReturnType::Int8 => 2,
             ReturnType::Uint8 => 3,
@@ -48,9 +49,6 @@ impl PartialOrd for ReturnType {
         let order_left: usize = self.into();
         let order_right: usize = other.into();
         order_left.partial_cmp(&order_right)
-
-        // Some(Ordering::Equal)
-        // let idx_self = order.
     }
 }
 
@@ -145,8 +143,8 @@ impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}. [{:?} Ret:{} Type:{}]",
-            self.line, self.name, self.return_type, self.symbol_type
+            "[`{}` Ret:{} Type:{}]",
+            self.name.0, self.return_type, self.symbol_type
         )
     }
 }

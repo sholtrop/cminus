@@ -2,6 +2,7 @@ use crate::{
     id::*,
     symbol::{Symbol, SymbolType},
 };
+use std::borrow::Borrow;
 use std::{collections::HashMap, fmt};
 
 #[derive(Clone, Copy)]
@@ -32,24 +33,42 @@ pub struct SymbolTable {
 
 impl fmt::Display for SymbolTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "###### Functions ######")?;
-        for (id, info) in self.functions.clone().into_iter() {
-            let SymbolInfo { symbol, .. } = self.symbols.get(&id).unwrap();
+        writeln!(f, "############# Functions ############")?;
+        for (id, info) in self.functions.borrow().iter() {
+            let SymbolInfo { symbol, .. } = self.symbols.get(id).unwrap();
             write!(f, "{} {} (", symbol.return_type, symbol.name)?;
             if info.parameters.is_empty() {
                 write!(f, "void")?;
             } else {
-                let mut param_iter = info.parameters.into_iter();
+                let params = &info.parameters;
+                let mut param_iter = params.iter();
                 let first = param_iter.next().unwrap();
-                let SymbolInfo { symbol, .. } = self.symbols.get(&first).unwrap();
-                write!(f, "{} {}", symbol.return_type, symbol.name)?;
+                let SymbolInfo { symbol, .. } = self.symbols.get(first).unwrap();
+                write!(
+                    f,
+                    "{:5}. {:5} {}",
+                    symbol.line, symbol.return_type, symbol.name
+                )?;
                 for param in param_iter {
-                    let SymbolInfo { symbol, .. } = self.symbols.get(&param).unwrap();
+                    let SymbolInfo { symbol, .. } = self.symbols.get(param).unwrap();
                     write!(f, ", {} {}", symbol.return_type, symbol.name)?;
                 }
             }
             write!(f, ")")?;
             writeln!(f)?;
+        }
+
+        writeln!(f, "\n############# Symbols ##############")?;
+        writeln!(f, "Line {:>15} {:>15}", "Type", "Name")?;
+        for (_, info) in self.symbols.borrow().iter() {
+            let symbol = &info.symbol;
+            writeln!(
+                f,
+                "{}. {:>16} {:>16}",
+                format!("{}", symbol.line),
+                format!("{}", symbol.return_type),
+                format!("{}", symbol.name)
+            )?;
         }
         Ok(())
     }

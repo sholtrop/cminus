@@ -6,13 +6,11 @@ use lib::parse;
 use pest_ascii_tree::into_ascii_tree;
 
 const INPUT: &str = "
+int x;
 int main(void) {
-    unsigned a = 1;
-    writeunsigned(a);
-    unsigned int b = -1; /* equals 2^32-1 */
-    writeunsigned(b);
-    return 0;
+    x = 1 + 2 - 3 * 4 % (5 / a);
 }
+
 ";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::collections::hash_map::Entry;
 
 use lexical::{ParseTree, Rule};
@@ -18,7 +19,6 @@ pub struct SyntaxBuilder {
     tree: SyntaxTree,
     scope_manager: ScopeManager,
     current_function: Option<SymbolId>,
-    current_line: usize,
 }
 
 impl SyntaxBuilder {
@@ -28,7 +28,6 @@ impl SyntaxBuilder {
             tree: SyntaxTree::new(),
             scope_manager: ScopeManager::new(),
             current_function: None,
-            current_line: 1,
         }
     }
 
@@ -39,11 +38,6 @@ impl SyntaxBuilder {
             tree: self.tree,
         }
     }
-
-    pub fn add_builtins(&mut self) {
-        todo!("implement")
-    }
-
     fn add_function(&mut self, symbol: Symbol) -> Result<SymbolId, SyntaxBuilderError> {
         if self.scope_manager.symbol_is_defined(&symbol.name) {
             return Err(
@@ -58,17 +52,9 @@ impl SyntaxBuilder {
     }
 
     /// Create and enter a new function.
-    pub fn enter_function(
-        &mut self,
-        name: SymbolName,
-        return_type: ReturnType,
-    ) -> Result<SymbolId, SyntaxBuilderError> {
-        let id = self.add_function(Symbol {
-            name: name.clone(),
-            return_type: return_type.clone(),
-            symbol_type: SymbolType::Function,
-            line: self.current_line,
-        })?;
+    pub fn enter_function(&mut self, symbol: Symbol) -> Result<SymbolId, SyntaxBuilderError> {
+        let name = symbol.name.clone();
+        let id = self.add_function(symbol)?;
         self.current_function = Some(id);
         self.tree
             .functions
@@ -115,7 +101,7 @@ impl SyntaxBuilder {
             ))
         })?;
         func_root.tree = Some(new_root);
-        todo!("Implement")
+        Ok(())
     }
 
     pub fn get_parameters(&self, id: &SymbolId) -> Result<Vec<Symbol>, SyntaxBuilderError> {
@@ -130,6 +116,7 @@ impl SyntaxBuilder {
                 .as_str()
                 .into());
         }
+
         let scope = if let Some(id) = self.current_function {
             SymbolScope::Local {
                 owning_function: id,
@@ -137,7 +124,11 @@ impl SyntaxBuilder {
         } else {
             SymbolScope::Global
         };
-        Ok(self.table.add_symbol(symbol, scope))
+        let name = symbol.borrow().name.clone();
+        let id = self.table.add_symbol(symbol, scope);
+        // We checked whether the symbol is defined already at the beginning of the function
+        self.scope_manager.add_symbol(id, name).unwrap();
+        Ok(id)
     }
 
     pub fn enter_new_scope(&mut self) {

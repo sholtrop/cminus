@@ -65,12 +65,13 @@ impl ScopeManager {
             if let Some(id) = scope.symbols.get(name) {
                 return Some(*id);
             }
+            log::trace!("Could not find {} in scope", name)
         }
         None
     }
 
     /// Whether the symbol with `name` is defined in the current scope.
-    /// Does not consider higher scopes.
+    /// (So `name` could also already be declared in higher scopes)
     pub fn symbol_is_defined(&self, name: &SymbolName) -> bool {
         self.scope_stack
             .last()

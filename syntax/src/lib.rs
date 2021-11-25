@@ -20,10 +20,5 @@ pub fn generate(input: ParseTree) -> Result<SyntaxResult, Box<dyn Error>> {
     let mut tree_walker = TreeWalker::new();
     let mut visitor = Visitor::new();
     tree_walker.construct_syntax_tree(input, &mut visitor)?;
-    let SyntaxResult { symbol_table, tree } = visitor.result();
-
-    log::trace!("SYNTAX TREE:\n{}", tree);
-    log::trace!("SYMBOL TABLE:\n{}", symbol_table);
-    // log::trace!("{:?}", symbol_table);
-    Err("Syntax tree generation not fully implemented yet".into())
+    Ok(visitor.result())
 }
