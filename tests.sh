@@ -1,1 +1,1 @@
-RUST_LOG=trace cargo run -p tests
+RUST_LOG=tests=info cargo run -p tests

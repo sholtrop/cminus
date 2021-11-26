@@ -634,6 +634,7 @@ dependencies = [
  "general",
  "lexical",
  "log",
+ "syntax",
 ]
 
 [[package]]
