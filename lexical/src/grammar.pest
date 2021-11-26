@@ -36,7 +36,7 @@ type_specifier = { "unsigned int" | "uint8_t" | "int8_t" | "int" | "unsigned" }
 
 formal_parameters = { parameter+ | void }
 
-var = { !type_specifier ~ (array_access | ident) }
+var = { !keyword ~ (array_access | ident) }
 
 parameter = { type_specifier ~ ident ~ "[]"? ~ ","? }
 
@@ -58,31 +58,49 @@ expression_stmt = _{ expression ~ ";" | ";" }
 
 decl_list = _{ var_declaration+ }
 
-expression = { assignment_expression }
+expression = { assignment | factor ~ (operation ~ factor)* }
 
-assignment_expression = _{ var ~ assign_op ~ expression | bool_expression }
+assignment = { var ~ assign ~ expression }
+assign = { "=" }
 
-assign_op = { "=" }
+operation = { add | sub | mul | div | modulo | lte | gte | neq | eq | gt | lt | and | or } 
+    add = { "+" }
+    sub = { "-" }
+    mul = { "*" }
+    div = { "/" }
+    modulo = { "%" }
+    and = { "&&" }
+    or = { "||" }
+    eq = { "==" }
+    neq = { "!=" }
+    lt = { "<" }
+    gt = { ">" }
+    lte = { "<=" }
+    gte = { ">=" }
 
-bool_expression = _{ rel_expression ~ (bool_op ~ bool_expression)* }
+// assignment_expression = _{ var ~ assign_op ~ expression | bool_expression }
 
-bool_op = { "&&" | "||" }
+// assign_op = { "=" }
 
-rel_expression = _{ eq_expression ~ (rel_op ~ rel_expression)* }
+// bool_expression = _{ rel_expression ~ (boolean_op ~ bool_expression)* }
 
-rel_op = { "<=" | ">=" | "<" | ">" }
+// boolean_op = { "&&" | "||" }
 
-eq_expression = _{ additive_expression ~ (eq_op ~ eq_expression)* }
+// rel_expression = _{ eq_expression ~ (relational_op ~ rel_expression)* }
 
-eq_op = { "==" | "!=" }
+// relational_op = { "<=" | ">=" | "<" | ">" }
 
-additive_expression = _{ mult_expression ~ (additive_op ~ additive_expression)* }
+// eq_expression = _{ additive_expression ~ (eq_op ~ eq_expression)* }
 
-additive_op = { "+" | "-" }
+// eq_op = { "==" | "!=" }
 
-mult_expression = _{ factor ~ (mult_op ~ mult_expression)* }
+// additive_expression = _{ mult_expression ~ (additive_op ~ additive_expression)* }
 
-mult_op = { "*" | "/" | "%" }
+// additive_op = { "+" | "-" }
+
+// mult_expression = _{ factor ~ (multiplicative_op ~ mult_expression)* }
+
+// multiplicative_op = { "*" | "/" | "%" }
 
 factor = _{ "(" ~ expression ~ ")" | function_call | var | number | unary ~ factor }
 

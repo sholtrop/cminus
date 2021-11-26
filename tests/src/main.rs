@@ -7,7 +7,7 @@ use std::io;
 
 fn main() -> io::Result<()> {
     init_logger();
-    // lexical_test::run()?;
-    syntax_test::run()?;
+    lexical_test::run()?;
+    // syntax_test::run()?;
     Ok(())
 }
