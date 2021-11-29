@@ -1,1 +1,1 @@
-RUST_LOG=tests=info cargo run -p tests
+cargo run -p tests --bin tests $@

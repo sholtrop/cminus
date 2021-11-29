@@ -1,6 +1,10 @@
 pub mod logging {
     use env_logger;
-    pub fn init_logger() {
-        env_logger::builder().format_timestamp(None).init();
+    use log::LevelFilter;
+    pub fn init_logger(level: LevelFilter) {
+        env_logger::builder()
+            .format_timestamp(None)
+            .filter_level(level)
+            .init();
     }
 }
