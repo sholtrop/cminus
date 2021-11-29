@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::{
     error::SyntaxBuilderError,
     id::{SymbolId, SymbolName},
@@ -5,8 +7,10 @@ use crate::{
     symbol::{ReturnType, Symbol, SymbolType},
     visitor::Visitor,
 };
+use itertools::Itertools;
 use lexical::{ParseNode, ParseTree, Rule};
 
+#[derive(Debug)]
 pub enum ParserValue {
     Symbol(Symbol),
     Symbols(Vec<Symbol>),
@@ -36,7 +40,7 @@ impl TreeWalker {
 
     pub fn construct_syntax_tree(
         &mut self,
-        mut parse_tree: ParseTree,
+        parse_tree: ParseTree,
         visitor: &mut Visitor,
     ) -> Result<(), SyntaxBuilderError> {
         for rule in parse_tree {
@@ -141,11 +145,9 @@ impl TreeWalker {
                 let mut nodes = parse_node.into_inner();
                 let mut current_name: Option<SymbolName> = None;
                 let mut assignments = vec![];
-                log::trace!("Before loop VAR_DECL");
                 loop {
                     match self.walk_tree(nodes.next(), visitor)? {
                         ParserValue::Name(name) => {
-                            log::trace!("Got name {}", name);
                             current_name = Some(name.clone());
                             visitor.visit_var_decl(name, decl_type, self.current_line)?;
                         }
@@ -293,16 +295,113 @@ impl TreeWalker {
                 let ident = SymbolName::from(parse_node.as_str());
                 Ok(ParserValue::Name(ident))
             }
-            Rule::expression => Ok(ParserValue::Node(SyntaxNode::Constant {
-                node_type: NodeType::Error,
-                return_type: ReturnType::Error,
-                value: ConstantNodeValue::ErrorMessage(
-                    "Expressions are not yet implemented".into(),
-                ),
-            })),
+            Rule::infix_op => {
+                use NodeType::*;
+                use Rule::*;
+                let op = parse_node.into_inner().next().unwrap();
+                let node = SyntaxNode::Binary {
+                    node_type: match op.as_rule() {
+                        add => Add,
+                        sub => Sub,
+                        mul => Mul,
+                        div => Div,
+                        modulo => Mod,
+                        and => And,
+                        or => Or,
+                        eq => RelEqual,
+                        neq => RelNotEqual,
+                        lt => RelLT,
+                        lte => RelLTE,
+                        gt => RelGT,
+                        gte => RelGTE,
+                        _ => unreachable!(),
+                    },
+                    return_type: ReturnType::Unknown,
+                    left: None,
+                    right: None,
+                };
+                Ok(ParserValue::Node(node))
+            }
+            Rule::expression => {
+                log::trace!("Enter expression `{}`", parse_node.as_str());
+                let mut list = parse_node
+                    .into_inner()
+                    .filter_map(|node| {
+                        let res = self.walk_tree(Some(node), visitor);
+                        if let Err(e) = res {
+                            return Some(SyntaxNode::from(e));
+                        }
+                        let res = res.unwrap();
+                        match res {
+                            ParserValue::Node(n) => Some(n),
+                            ParserValue::Skip => None,
+                            _ => panic!("Expected syntax node"),
+                        }
+                    })
+                    .collect::<VecDeque<SyntaxNode>>();
+                while list.len() != 1 {
+                    let mut highest_prec;
+                    let highest_idx = list
+                        .iter()
+                        .enumerate()
+                        .filter(|(idx, _)| idx % 2 == 1)
+                        .position_max_by(|(_, a), (_, b)| {
+                            a.precedence().unwrap().cmp(&b.precedence().unwrap())
+                        })
+                        .unwrap()
+                        * 2
+                        + 1;
+
+                    // log::trace!("{:?}", list);
+                    highest_prec = list.remove(highest_idx).unwrap();
+                    log::trace!(
+                        "Highest idx {} | Highest prec {}",
+                        highest_idx,
+                        highest_prec
+                    );
+                    // log::trace!("{:?}", list);
+                    let new_left = list.remove(highest_idx - 1).unwrap();
+                    let new_right = list.remove(highest_idx - 1).unwrap();
+                    visitor.visit_binary(new_left, &mut highest_prec, new_right)?;
+                    list.insert(highest_idx - 1, highest_prec);
+                }
+                Ok(ParserValue::Node(list.pop_front().unwrap()))
+            }
             Rule::var => {
                 let var = SymbolName::from(parse_node.as_str());
                 Ok(ParserValue::Name(var))
+            }
+            Rule::unary => {
+                let mut nodes = parse_node.into_inner();
+                let unary_op = loop {
+                    match self.walk_tree(nodes.next(), visitor)? {
+                        ParserValue::Node(n) => break n,
+                        ParserValue::Skip => continue,
+                        _ => return Err(SyntaxBuilderError::from("Expected node")),
+                    }
+                };
+                let unary_child = loop {
+                    match self.walk_tree(nodes.next(), visitor)? {
+                        ParserValue::Node(n) => break n,
+                        ParserValue::Skip => continue,
+                        _ => return Err(SyntaxBuilderError::from("Expected node")),
+                    }
+                };
+                let result = visitor.visit_unary(unary_op, unary_child)?;
+                Ok(ParserValue::Node(result))
+            }
+            Rule::unary_op => {
+                let return_val = SyntaxNode::Unary {
+                    child: None,
+                    return_type: ReturnType::Unknown,
+                    node_type: match parse_node.as_str() {
+                        "-" => NodeType::SignMinus,
+                        "+" => NodeType::SignPlus,
+                        "!" => NodeType::Not,
+                        _ => unreachable!(),
+                    },
+                };
+                Ok(ParserValue::Node(return_val))
             }
             Rule::COMMENT | Rule::WHITESPACE => {
                 // We can never enter the newline rule, so we manually count newlines in whitespace/comments
@@ -329,3 +428,19 @@ impl TreeWalker {
         }
     }
 }
+
+// fn eval_expression(exp: ParseNode, prec_climber: &PrecClimber<Rule>) -> SyntaxNode {
+// let exp = exp.into_inner();
+// prec_climber.climb(
+//     exp,
+//     |node| {
+//         let snode = loop {};
+//     },
+//     |lhs: SyntaxNode, op: ParseNode, rhs: SyntaxNode| match op.as_rule() {
+//         _ => {
+//             log::trace!("{} {:?} {}", lhs, op.as_rule(), rhs);
+//             SyntaxNode::Empty
+//         }
+//     },
+// )
+// }

@@ -117,6 +117,61 @@ impl fmt::Display for ConstantNodeValue {
     }
 }
 
+impl From<ConstantNodeValue> for i64 {
+    fn from(val: ConstantNodeValue) -> Self {
+        match val {
+            ConstantNodeValue::ErrorMessage(msg) => panic!("Node had error message: {}", msg),
+            ConstantNodeValue::Int(v) => v.into(),
+            ConstantNodeValue::Int8(v) => v.into(),
+            ConstantNodeValue::Uint(v) => v.into(),
+            ConstantNodeValue::Uint8(v) => v.into(),
+        }
+    }
+}
+
+pub struct PreorderIter<'a> {
+    stack: Vec<&'a SyntaxNode>,
+}
+
+impl<'a> PreorderIter<'a> {
+    pub fn new(root: &'a SyntaxNode) -> Self {
+        Self { stack: vec![root] }
+    }
+}
+
+impl<'a> Iterator for PreorderIter<'a> {
+    type Item = &'a SyntaxNode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(n) = self.stack.pop() {
+            match *n {
+                SyntaxNode::Binary {
+                    ref left,
+                    ref right,
+                    ..
+                } => {
+                    if let Some(left) = left {
+                        self.stack.push(left.as_ref());
+                    }
+                    if let Some(right) = right {
+                        self.stack.push(right.as_ref());
+                    }
+                }
+                SyntaxNode::Unary {
+                    child: Some(ref child),
+                    ..
+                } => {
+                    self.stack.push(child.as_ref());
+                }
+                _ => {}
+            }
+            Some(n)
+        } else {
+            None
+        }
+    }
+}
+
 pub type SyntaxNodeBox = Option<Box<SyntaxNode>>;
 
 #[derive(PartialEq, Clone, Debug)]
@@ -158,8 +213,16 @@ impl SyntaxNode {
     /// If the coercion is valid, will return a unary coercion [SyntaxNode] with the `from` node as its child.
     pub fn coerce(from: SyntaxNode, to: ReturnType) -> Result<SyntaxNode, SyntaxBuilderError> {
         let from_ret_t = from.return_type();
+        assert_ne!(from_ret_t, to);
+        if to == ReturnType::Bool {
+            Ok(SyntaxNode::Unary {
+                child: Some(Box::new(from)),
+                node_type: NodeType::Coercion,
+                return_type: to,
+            })
+        }
         // ReturnTypes have a defined partial ordering for coercion
-        if from_ret_t < to {
+        else if from_ret_t < to {
             Ok(SyntaxNode::Unary {
                 child: Some(Box::new(from)),
                 return_type: to,
@@ -178,7 +241,7 @@ impl SyntaxNode {
             SyntaxNode::Unary { return_type, .. }
             | SyntaxNode::Binary { return_type, .. }
             | SyntaxNode::Constant { return_type, .. }
-            | SyntaxNode::Symbol { return_type, .. } => return_type.clone(),
+            | SyntaxNode::Symbol { return_type, .. } => *return_type,
             SyntaxNode::Empty => ReturnType::Error,
         }
     }
@@ -190,6 +253,41 @@ impl SyntaxNode {
             | SyntaxNode::Constant { node_type, .. }
             | SyntaxNode::Symbol { node_type, .. } => node_type.clone(),
             SyntaxNode::Empty => NodeType::Error,
+        }
+    }
+
+    pub fn preorder(&self) -> PreorderIter {
+        PreorderIter::new(self)
+    }
+
+    /*        assign => 0,
+    or | and => 1,
+    gt | gte | lt | lte => 2,
+    eq | neq => 3,
+    add | sub => 4,
+    mul | div | modulo => 5,
+    _ => 6, */
+    pub fn precedence(&self) -> Result<u8, SyntaxBuilderError> {
+        use NodeType::*;
+
+        if let Self::Binary { node_type, .. } = self {
+            match node_type {
+                Assignment => Ok(0),
+                Or | And => Ok(1),
+                RelGT | RelGTE | RelLT | RelLTE => Ok(2),
+                RelEqual | RelNotEqual => Ok(3),
+                Add | Sub => Ok(4),
+                Mul | Div | Mod => Ok(5),
+                _ => Err(SyntaxBuilderError(format!(
+                    "Node {} is not an infix operator",
+                    self
+                ))),
+            }
+        } else {
+            Err(SyntaxBuilderError(format!(
+                "Node {} is not an infix operator",
+                self
+            )))
         }
     }
 }

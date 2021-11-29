@@ -131,7 +131,7 @@ impl fmt::Display for SymbolType {
         )
     }
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Symbol {
     pub name: SymbolName,
     pub return_type: ReturnType,

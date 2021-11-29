@@ -58,12 +58,12 @@ expression_stmt = _{ expression ~ ";" | ";" }
 
 decl_list = _{ var_declaration+ }
 
-expression = { assignment | factor ~ (operation ~ factor)* }
+expression = { assignment | factor ~ (infix_op ~ factor)* }
 
 assignment = { var ~ assign ~ expression }
 assign = { "=" }
 
-operation = { add | sub | mul | div | modulo | lte | gte | neq | eq | gt | lt | and | or } 
+infix_op = { add | sub | mul | div | modulo | lte | gte | neq | eq | gt | lt | and | or } 
     add = { "+" }
     sub = { "-" }
     mul = { "*" }
@@ -102,9 +102,13 @@ operation = { add | sub | mul | div | modulo | lte | gte | neq | eq | gt | lt | 
 
 // multiplicative_op = { "*" | "/" | "%" }
 
-factor = _{ "(" ~ expression ~ ")" | function_call | var | number | unary ~ factor }
+factor = _{ subexpression | function_call | var | number | unary }
 
-unary = { "-" | "!" | "+" }
+subexpression = _{ "(" ~ expression ~ ")" }
+
+unary = { unary_op  ~ factor }
+
+unary_op = { "-" | "!" | "+" }
 
 array_access = { ident ~ "[" ~ expression ~ "]" }
 

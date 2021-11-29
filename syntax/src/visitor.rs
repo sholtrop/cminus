@@ -274,4 +274,73 @@ impl Visitor {
 
         Ok(node)
     }
+
+    pub fn visit_unary(
+        &mut self,
+        mut op: SyntaxNode,
+        unary_child: SyntaxNode,
+    ) -> Result<SyntaxNode, SyntaxBuilderError> {
+        let op_type = op.node_type();
+        if let SyntaxNode::Unary {
+            ref mut child,
+            ref mut return_type,
+            ..
+        } = op
+        {
+            if op_type == NodeType::Not {
+                *return_type = ReturnType::Bool;
+                *child = Some(Box::new(SyntaxNode::coerce(unary_child, ReturnType::Bool)?))
+            } else {
+                *return_type = unary_child.return_type();
+                *child = Some(Box::new(unary_child));
+            }
+        }
+        Ok(op)
+    }
+
+    pub fn visit_binary(
+        &self,
+        mut left_child: SyntaxNode,
+        op: &mut SyntaxNode,
+        mut right_child: SyntaxNode,
+    ) -> Result<(), SyntaxBuilderError> {
+        use NodeType::*;
+        let common_ret_type;
+        if let SyntaxNode::Binary {
+            ref mut return_type,
+            ref mut left,
+            ref mut right,
+            node_type,
+        } = op
+        {
+            match node_type {
+                RelGT | RelGTE | RelLT | RelLTE | RelNotEqual | RelEqual | And | Or => {
+                    left_child = SyntaxNode::coerce(left_child, ReturnType::Bool)?;
+                    right_child = SyntaxNode::coerce(right_child, ReturnType::Bool)?;
+                    common_ret_type = ReturnType::Bool;
+                }
+                _ => {
+                    if left_child.return_type() == right_child.return_type() {
+                        common_ret_type = left_child.return_type();
+                    } else if left_child.return_type() < right_child.return_type() {
+                        common_ret_type = right_child.return_type();
+                        left_child = SyntaxNode::coerce(left_child, common_ret_type)?;
+                    } else {
+                        common_ret_type = left_child.return_type();
+                        right_child = SyntaxNode::coerce(right_child, common_ret_type)?;
+                    }
+                }
+            };
+
+            *return_type = common_ret_type;
+            *left = Some(Box::new(left_child));
+            *right = Some(Box::new(right_child));
+        } else {
+            return Err(SyntaxBuilderError(format!(
+                "Node {} is not a binary operator",
+                op
+            )));
+        }
+        Ok(())
+    }
 }

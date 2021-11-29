@@ -272,7 +272,6 @@ name = "lexical"
 version = "0.1.0"
 dependencies = [
  "general",
- "lazy_static 1.4.0",
  "log",
  "pest",
  "pest_ascii_tree",
