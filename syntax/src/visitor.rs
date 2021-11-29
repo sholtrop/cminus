@@ -236,12 +236,49 @@ impl Visitor {
         stmt_list.unwrap_or(SyntaxNode::Empty)
     }
 
-    pub fn visit_return(&mut self, ret_node: SyntaxNode) -> SyntaxNode {
-        SyntaxNode::Unary {
-            node_type: NodeType::Return,
-            return_type: ret_node.return_type(),
-            child: Some(Box::new(ret_node)),
+    pub fn visit_return(&mut self, ret_node: Option<SyntaxNode>) -> SyntaxNode {
+        // TODO: coercions
+        if let Some(ret_node) = ret_node {
+            SyntaxNode::Unary {
+                node_type: NodeType::Return,
+                return_type: ret_node.return_type(),
+                child: Some(Box::new(ret_node)),
+            }
+        } else {
+            SyntaxNode::Unary {
+                node_type: NodeType::Return,
+                return_type: ReturnType::Void,
+                child: None,
+            }
         }
+    }
+
+    pub fn visit_if(
+        &mut self,
+        mut condition: SyntaxNode,
+        if_body: SyntaxNode,
+        else_body: Option<SyntaxNode>,
+    ) -> Result<SyntaxNode, SyntaxBuilderError> {
+        let cond_ret = condition.return_type();
+        if cond_ret != ReturnType::Bool {
+            condition = SyntaxNode::coerce(condition, ReturnType::Bool)?;
+        }
+        let rchild = if let Some(else_body) = else_body {
+            SyntaxNode::Binary {
+                node_type: NodeType::IfTargets,
+                return_type: ReturnType::Void,
+                left: Some(Box::new(if_body)),
+                right: Some(Box::new(else_body)),
+            }
+        } else {
+            if_body
+        };
+        Ok(SyntaxNode::Binary {
+            node_type: NodeType::If,
+            return_type: ReturnType::Void,
+            left: Some(Box::new(condition)),
+            right: Some(Box::new(rchild)),
+        })
     }
 
     pub fn visit_assignment(

@@ -181,7 +181,15 @@ impl TreeWalker {
                 let mut params = vec![];
                 loop {
                     match self.walk_tree(nodes.next(), visitor)? {
-                        ParserValue::None => break,
+                        ParserValue::ReturnType(void) => {
+                            if void == ReturnType::Void {
+                                break;
+                            } else {
+                                return Err(SyntaxBuilderError::from(
+                                    "Expected identifier as name for param",
+                                ));
+                            }
+                        }
                         ParserValue::Id(param_id) => params.push(param_id),
                         ParserValue::Skip => continue,
                         ParserValue::End => break,
@@ -225,7 +233,7 @@ impl TreeWalker {
                 let id = visitor.visit_param_decl(ident, type_spec, self.current_line)?;
                 Ok(ParserValue::Id(id))
             }
-            Rule::void => Ok(ParserValue::None),
+            Rule::void => Ok(ParserValue::ReturnType(ReturnType::Void)),
             Rule::compound_stmt => {
                 visitor.add_local_scope();
                 let mut nodes = parse_node.into_inner();
@@ -322,6 +330,58 @@ impl TreeWalker {
                 };
                 Ok(ParserValue::Node(node))
             }
+            Rule::return_stmt => {
+                let mut nodes = parse_node.into_inner();
+                let return_exp = loop {
+                    match self.walk_tree(nodes.next(), visitor)? {
+                        ParserValue::Node(n) => break Some(n),
+                        ParserValue::End => break None,
+                        ParserValue::Skip => continue,
+                        _ => return Err(SyntaxBuilderError::from("Expected return expression")),
+                    };
+                };
+                let return_node = visitor.visit_return(return_exp);
+                Ok(ParserValue::Node(return_node))
+            }
+            Rule::selection_stmt => {
+                let mut nodes = parse_node.into_inner();
+                let if_exp = loop {
+                    match self.walk_tree(nodes.next(), visitor)? {
+                        ParserValue::Node(n) => break n,
+                        ParserValue::Skip => continue,
+                        _ => {
+                            return Err(SyntaxBuilderError::from(
+                                "Expected expression node for if-statement test",
+                            ))
+                        }
+                    }
+                };
+                let if_body = loop {
+                    match self.walk_tree(nodes.next(), visitor)? {
+                        ParserValue::Node(n) => break n,
+                        ParserValue::Skip => continue,
+                        _ => {
+                            return Err(SyntaxBuilderError::from(
+                                "Expected statement node for if-statement body",
+                            ))
+                        }
+                    }
+                };
+                let else_body = loop {
+                    match self.walk_tree(nodes.next(), visitor)? {
+                        ParserValue::Node(n) => break Some(n),
+                        ParserValue::End => break None,
+                        ParserValue::Skip => continue,
+                        _ => {
+                            return Err(SyntaxBuilderError::from(
+                                "Expected statement node for if-statement body",
+                            ))
+                        }
+                    }
+                };
+                let if_node = visitor.visit_if(if_exp, if_body, else_body)?;
+                Ok(ParserValue::Node(if_node))
+            }
             Rule::expression => {
                 log::trace!("Enter expression `{}`", parse_node.as_str());
                 let mut list = parse_node
@@ -352,14 +412,12 @@ impl TreeWalker {
                         * 2
                         + 1;
 
-                    // log::trace!("{:?}", list);
                     highest_prec = list.remove(highest_idx).unwrap();
                     log::trace!(
                         "Highest idx {} | Highest prec {}",
                         highest_idx,
                         highest_prec
                     );
-                    // log::trace!("{:?}", list);
                     let new_left = list.remove(highest_idx - 1).unwrap();
                     let new_right = list.remove(highest_idx - 1).unwrap();
                     visitor.visit_binary(new_left, &mut highest_prec, new_right)?;
@@ -369,6 +427,7 @@ impl TreeWalker {
             }
             Rule::var => {
                 let var = SymbolName::from(parse_node.as_str());
+                // TODO: visit l/r variable
                 Ok(ParserValue::Name(var))
             }
             Rule::unary => {

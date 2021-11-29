@@ -1,5 +1,7 @@
-int main(void)
-
+void main(void)
 {
-    int a = 2000 && 2;
+    1;
+    2;
+    3;
+    a;
 }

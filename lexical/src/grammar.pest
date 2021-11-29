@@ -78,30 +78,6 @@ infix_op = { add | sub | mul | div | modulo | lte | gte | neq | eq | gt | lt | a
     lte = { "<=" }
     gte = { ">=" }
 
-// assignment_expression = _{ var ~ assign_op ~ expression | bool_expression }
-
-// assign_op = { "=" }
-
-// bool_expression = _{ rel_expression ~ (boolean_op ~ bool_expression)* }
-
-// boolean_op = { "&&" | "||" }
-
-// rel_expression = _{ eq_expression ~ (relational_op ~ rel_expression)* }
-
-// relational_op = { "<=" | ">=" | "<" | ">" }
-
-// eq_expression = _{ additive_expression ~ (eq_op ~ eq_expression)* }
-
-// eq_op = { "==" | "!=" }
-
-// additive_expression = _{ mult_expression ~ (additive_op ~ additive_expression)* }
-
-// additive_op = { "+" | "-" }
-
-// mult_expression = _{ factor ~ (multiplicative_op ~ mult_expression)* }
-
-// multiplicative_op = { "*" | "/" | "%" }
-
 factor = _{ subexpression | function_call | var | number | unary }
 
 subexpression = _{ "(" ~ expression ~ ")" }
