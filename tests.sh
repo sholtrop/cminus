@@ -1,1 +1,1 @@
-cargo run -p tests --bin tests $@
+cargo run -p tests --bin tests "$@"

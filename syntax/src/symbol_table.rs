@@ -62,13 +62,15 @@ impl fmt::Display for SymbolTable {
         writeln!(f, "Line {:>15} {:>15}", "Type", "Name")?;
         for (_, info) in self.symbols.borrow().iter() {
             let symbol = &info.symbol;
-            writeln!(
-                f,
-                "{}. {:>16} {:>16}",
-                format!("{}", symbol.line),
-                format!("{}", symbol.return_type),
-                format!("{}", symbol.name)
-            )?;
+            if symbol.symbol_type != SymbolType::Function {
+                writeln!(
+                    f,
+                    "{}. {:>16} {:>16}",
+                    format!("{}", symbol.line),
+                    format!("{}", symbol.return_type),
+                    format!("{}", symbol.name)
+                )?;
+            }
         }
         Ok(())
     }

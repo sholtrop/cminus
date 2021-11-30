@@ -1,7 +1,5 @@
 void main(void)
 {
-    1;
-    2;
-    3;
-    a;
+    int a = 1, b, c, d = 2;
+    unsigned int e, f = 3, g, h;
 }

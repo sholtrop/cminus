@@ -129,22 +129,27 @@ impl TreeWalker {
             }
             Rule::var_decl_list => {
                 let mut nodes = parse_node.into_inner();
+                let mut assignments = vec![];
                 loop {
                     match self.walk_tree(nodes.next(), visitor)? {
-                        ParserValue::None => return Ok(ParserValue::None),
-                        ParserValue::Nodes(n) => return Ok(ParserValue::Nodes(n)),
-                        ParserValue::Skip => continue,
+                        // Declaration with assignment
+                        ParserValue::Node(n) => assignments.push(n),
+                        ParserValue::End => break,
+                        // Only a declaration, no assignment
+                        ParserValue::None | ParserValue::Skip => continue,
                         _ => return Err(SyntaxBuilderError::from("Did not find var_decl nodes")),
                     }
                 }
+                self.current_decl_type = None;
+                Ok(ParserValue::Nodes(assignments))
             }
             Rule::var_decl_maybe_init => {
-                let decl_type = self.current_decl_type.take().ok_or_else(|| {
+                let decl_type = self.current_decl_type.ok_or_else(|| {
                     SyntaxBuilderError::from("No type specifier set for declaration list")
                 })?;
                 let mut nodes = parse_node.into_inner();
                 let mut current_name: Option<SymbolName> = None;
-                let mut assignments = vec![];
+                let mut assignment: Option<SyntaxNode> = None;
                 loop {
                     match self.walk_tree(nodes.next(), visitor)? {
                         ParserValue::Name(name) => {
@@ -153,8 +158,7 @@ impl TreeWalker {
                         }
                         ParserValue::Node(exp) => {
                             if let Some(var) = current_name.clone() {
-                                let assignment = visitor.visit_assignment(var, exp)?;
-                                assignments.push(assignment);
+                                assignment = Some(visitor.visit_assignment(var, exp)?);
                             } else {
                                 log::warn!(
                                     "Could not visit assignment because `current_name` was None"
@@ -170,10 +174,10 @@ impl TreeWalker {
                         }
                     }
                 }
-                if assignments.is_empty() {
-                    Ok(ParserValue::None)
+                if let Some(assignment) = assignment {
+                    Ok(ParserValue::Node(assignment))
                 } else {
-                    Ok(ParserValue::Nodes(assignments))
+                    Ok(ParserValue::None)
                 }
             }
             Rule::formal_parameters => {
@@ -430,6 +434,33 @@ impl TreeWalker {
                 // TODO: visit l/r variable
                 Ok(ParserValue::Name(var))
             }
+            Rule::iteration_stmt => {
+                let mut nodes = parse_node.into_inner();
+                let condition = loop {
+                    match self.walk_tree(nodes.next(), visitor)? {
+                        ParserValue::Node(exp) => break exp,
+                        ParserValue::Skip => continue,
+                        _ => {
+                            return Err(SyntaxBuilderError::from(
+                                "Expected condition expression for while loop",
+                            ))
+                        }
+                    }
+                };
+                let statement = loop {
+                    match self.walk_tree(nodes.next(), visitor)? {
+                        ParserValue::Node(stmt) => break stmt,
+                        ParserValue::Skip => continue,
+                        _ => {
+                            return Err(SyntaxBuilderError::from(
+                                "Expected statement for while loop",
+                            ))
+                        }
+                    }
+                };
+                let while_node = visitor.visit_while(condition, statement)?;
+                Ok(ParserValue::Node(while_node))
+            }
             Rule::unary => {
                 let mut nodes = parse_node.into_inner();
                 let unary_op = loop {
@@ -487,19 +518,3 @@ impl TreeWalker {
         }
     }
 }
-
-// fn eval_expression(exp: ParseNode, prec_climber: &PrecClimber<Rule>) -> SyntaxNode {
-// let exp = exp.into_inner();
-// prec_climber.climb(
-//     exp,
-//     |node| {
-//         let snode = loop {};
-//     },
-//     |lhs: SyntaxNode, op: ParseNode, rhs: SyntaxNode| match op.as_rule() {
-//         _ => {
-//             log::trace!("{} {:?} {}", lhs, op.as_rule(), rhs);
-//             SyntaxNode::Empty
-//         }
-//     },
-// )
-// }

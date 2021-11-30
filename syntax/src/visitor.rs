@@ -253,6 +253,23 @@ impl Visitor {
         }
     }
 
+    pub fn visit_while(
+        &mut self,
+        mut expression: SyntaxNode,
+        statement: SyntaxNode,
+    ) -> Result<SyntaxNode, SyntaxBuilderError> {
+        if expression.return_type() != ReturnType::Bool {
+            expression = SyntaxNode::coerce(expression, ReturnType::Bool)?;
+        }
+        let while_node = SyntaxNode::Binary {
+            node_type: NodeType::While,
+            return_type: ReturnType::Void,
+            left: Some(Box::new(expression)),
+            right: Some(Box::new(statement)),
+        };
+        Ok(while_node)
+    }
+
     pub fn visit_if(
         &mut self,
         mut condition: SyntaxNode,
