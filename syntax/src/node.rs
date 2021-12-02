@@ -242,7 +242,7 @@ impl SyntaxNode {
             | SyntaxNode::Binary { return_type, .. }
             | SyntaxNode::Constant { return_type, .. }
             | SyntaxNode::Symbol { return_type, .. } => *return_type,
-            SyntaxNode::Empty => ReturnType::Error,
+            SyntaxNode::Empty => ReturnType::Void,
         }
     }
 
@@ -252,7 +252,7 @@ impl SyntaxNode {
             | SyntaxNode::Binary { node_type, .. }
             | SyntaxNode::Constant { node_type, .. }
             | SyntaxNode::Symbol { node_type, .. } => node_type.clone(),
-            SyntaxNode::Empty => NodeType::Error,
+            SyntaxNode::Empty => NodeType::Unknown,
         }
     }
 

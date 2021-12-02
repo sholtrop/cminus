@@ -26,6 +26,8 @@ pub struct SyntaxTree {
     pub functions: HashMap<SymbolId, FunctionRoot>,
 }
 
+const BUILT_INS: [&str; 3] = ["writeinteger", "writeunsigned", "readinteger"];
+
 impl SyntaxTree {
     pub fn new() -> Self {
         Self {
@@ -41,6 +43,10 @@ impl SyntaxTree {
 impl fmt::Display for SyntaxTree {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for func in self.functions.values() {
+            if BUILT_INS.contains(&func.name.0.as_str()) {
+                continue;
+            }
+
             writeln!(f, "function `{}`", func.name)?;
             if let Some(tree) = &func.tree {
                 let mut buff = vec![];

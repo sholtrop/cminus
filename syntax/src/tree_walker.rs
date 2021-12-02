@@ -280,6 +280,7 @@ impl TreeWalker {
                 let params = loop {
                     match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Nodes(n) => break n,
+                        ParserValue::End => break vec![],
                         ParserValue::Skip => continue,
                         _ => unreachable!("Expected actual parameters"),
                     };

@@ -1,5 +1,5 @@
 use std::io;
-use syntax::{FullSyntaxTree, NodeType};
+use syntax::{FullSyntaxTree, NodeType, SyntaxNode};
 use tests::{collect_tests_in_path, run_single_test, TestStats};
 
 const PROGRAM_TEST_PATH: &str = "tests/testfiles/general/programs";
@@ -26,6 +26,9 @@ pub fn test_function(input: &str) -> Result<(), &str> {
             .preorder()
         {
             if node.node_type() == NodeType::Error {
+                if let SyntaxNode::Constant { value, .. } = node {
+                    log::error!("Found error node: {}", value);
+                }
                 return Err("Error node found");
             }
         }

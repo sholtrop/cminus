@@ -40,6 +40,7 @@ impl Visitor {
     }
 
     fn add_builtins(&mut self) {
+        // writeinteger
         let id = self
             .visit_func_start(Symbol {
                 name: SymbolName::from("writeinteger"),
@@ -54,7 +55,22 @@ impl Visitor {
         self.leave_local_scope();
         self.visit_func_end(&id, SyntaxNode::Empty)
             .expect("Error adding builtins: Function `writeinteger` end");
-
+        // writeunsigned
+        let id = self
+            .visit_func_start(Symbol {
+                name: SymbolName::from("writeunsigned"),
+                return_type: ReturnType::Void,
+                symbol_type: SymbolType::Function,
+                line: 0,
+            })
+            .expect("Error adding builtins: Function `writeunsigned` start");
+        self.add_local_scope();
+        self.visit_param_decl(SymbolName::from("i"), ReturnType::Uint, 0)
+            .expect("Error adding builtins: Param `i` for `writeunsigned`");
+        self.leave_local_scope();
+        self.visit_func_end(&id, SyntaxNode::Empty)
+            .expect("Error adding builtins: Function `writeunsigned` end");
+        // readinteger
         let id = self
             .visit_func_start(Symbol {
                 name: SymbolName::from("readinteger"),
@@ -375,26 +391,22 @@ impl Visitor {
             node_type,
         } = op
         {
-            match node_type {
-                RelGT | RelGTE | RelLT | RelLTE | RelNotEqual | RelEqual | And | Or => {
-                    left_child = SyntaxNode::coerce(left_child, ReturnType::Bool)?;
-                    right_child = SyntaxNode::coerce(right_child, ReturnType::Bool)?;
-                    common_ret_type = ReturnType::Bool;
-                }
-                _ => {
-                    if left_child.return_type() == right_child.return_type() {
-                        common_ret_type = left_child.return_type();
-                    } else if left_child.return_type() < right_child.return_type() {
-                        common_ret_type = right_child.return_type();
-                        left_child = SyntaxNode::coerce(left_child, common_ret_type)?;
-                    } else {
-                        common_ret_type = left_child.return_type();
-                        right_child = SyntaxNode::coerce(right_child, common_ret_type)?;
-                    }
-                }
-            };
+            if left_child.return_type() == right_child.return_type() {
+                common_ret_type = left_child.return_type();
+            } else if left_child.return_type() < right_child.return_type() {
+                common_ret_type = right_child.return_type();
+                left_child = SyntaxNode::coerce(left_child, common_ret_type)?;
+            } else {
+                common_ret_type = left_child.return_type();
+                right_child = SyntaxNode::coerce(right_child, common_ret_type)?;
+            }
 
-            *return_type = common_ret_type;
+            *return_type = match node_type {
+                RelGT | RelGTE | RelLT | RelLTE | RelNotEqual | RelEqual | And | Or => {
+                    ReturnType::Bool
+                }
+                _ => common_ret_type,
+            };
             *left = Some(Box::new(left_child));
             *right = Some(Box::new(right_child));
         } else {

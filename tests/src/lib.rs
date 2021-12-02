@@ -69,23 +69,20 @@ pub fn collect_tests_in_path(path: impl Into<PathBuf>) -> io::Result<Vec<Test>> 
 }
 
 pub fn run_single_test(test: Test, test_func: TestFunction) -> Result<(), TestFailed> {
+    log::info!("Running test {}", test.name);
     let input = std::fs::read_to_string(test.path).or(Err(TestFailed {}))?;
     let result = test_func(&input);
     match (result, test.expectation) {
-        (Ok(_), Expectation::Success) => {
-            log::info!("PASSED {}", test.name);
-            Ok(())
-        }
-        (Err(_), Expectation::Fail) => {
-            log::info!("PASSED {}", test.name);
+        (Ok(_), Expectation::Success) | (Err(_), Expectation::Fail) => {
+            log::info!("↪    PASSED");
             Ok(())
         }
         (Err(_), Expectation::Success) => {
-            log::error!("FAILED {}\nExpected Success, got Fail", test.name);
+            log::error!("↪   FAILED\nExpected Success, got Fail");
             Err(().into())
         }
         (Ok(_), Expectation::Fail) => {
-            log::error!("FAILED {}\nExpected Fail, got Success", test.name);
+            log::error!("↪   FAILED\nExpected Fail, got Success");
             Err(().into())
         }
     }

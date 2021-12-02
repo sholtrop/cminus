@@ -65,8 +65,8 @@ impl ScopeManager {
             if let Some(id) = scope.symbols.get(name) {
                 return Some(*id);
             }
-            log::trace!("Could not find {} in scope", name)
         }
+        log::trace!("Could not find {} in scope", name);
         None
     }
 
