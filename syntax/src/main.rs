@@ -12,6 +12,7 @@ mod visitor;
 use clap::clap_app;
 use general::logging;
 use log::LevelFilter;
+use syntax::{NodeType, SyntaxNode};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = clap_app!(myapp =>
@@ -32,5 +33,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let res = syntax::generate(parse_tree)?;
     log::info!("\n{}", res.symbol_table);
     log::info!("\n{}", res.tree);
+    for (_, func) in res.tree.functions {
+        for node in func.tree.unwrap().preorder() {
+            if let SyntaxNode::Constant {
+                node_type, value, ..
+            } = node
+            {
+                if *node_type == NodeType::Error {
+                    log::error!("Error: {}", value.to_string())
+                }
+            }
+        }
+    }
     Ok(())
 }

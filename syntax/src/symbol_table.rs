@@ -44,11 +44,7 @@ impl fmt::Display for SymbolTable {
                 let mut param_iter = params.iter();
                 let first = param_iter.next().unwrap();
                 let SymbolInfo { symbol, .. } = self.symbols.get(first).unwrap();
-                write!(
-                    f,
-                    "{:5}. {:5} {}",
-                    symbol.line, symbol.return_type, symbol.name
-                )?;
+                write!(f, "{:5} {}", symbol.return_type, symbol.name)?;
                 for param in param_iter {
                     let SymbolInfo { symbol, .. } = self.symbols.get(param).unwrap();
                     write!(f, ", {} {}", symbol.return_type, symbol.name)?;

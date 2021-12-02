@@ -85,7 +85,7 @@
           "kind": "bin"
         }
       },
-      "args": [],
+      "args": ["test.c"],
       "env": {
         "RUST_LOG": "trace"
       },

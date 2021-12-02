@@ -4,7 +4,6 @@ use pest::{
     Parser,
 };
 use pest_derive::Parser;
-use Rule::*;
 // lazy_static! {
 //     static ref PREC_CLIMBER: PrecClimber<Rule> = {
 //         use Assoc::*;

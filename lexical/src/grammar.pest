@@ -1,5 +1,5 @@
 
-program = _{ SOI ~ declaration_list ~ EOI}
+program = { SOI ~ declaration_list ~ EOI}
 
 alpha = _{ 'a'..'z' | 'A'..'Z' }
 digit = _{ '0'..'9' }
@@ -36,7 +36,7 @@ type_specifier = { "unsigned int" | "uint8_t" | "int8_t" | "int" | "unsigned" }
 
 formal_parameters = { parameter+ | void }
 
-var = { !keyword ~ (array_access | ident) }
+lvar = { !keyword ~ (array_access | ident) }
 
 parameter = { type_specifier ~ ident ~ "[]"? ~ ","? }
 
@@ -60,8 +60,8 @@ decl_list = _{ var_declaration+ }
 
 expression = { assignment | factor ~ (infix_op ~ factor)* }
 
-assignment = { var ~ assign ~ expression }
-assign = { "=" }
+assignment = { lvar ~ assign ~ expression }
+assign = _{ "=" }
 
 infix_op = { add | sub | mul | div | modulo | lte | gte | neq | eq | gt | lt | and | or } 
     add = { "+" }
@@ -78,7 +78,9 @@ infix_op = { add | sub | mul | div | modulo | lte | gte | neq | eq | gt | lt | a
     lte = { "<=" }
     gte = { ">=" }
 
-factor = _{ subexpression | function_call | var | number | unary }
+factor = _{ subexpression | function_call | rvar | number | unary }
+
+rvar = { !keyword ~ (array_access | ident) }
 
 subexpression = _{ "(" ~ expression ~ ")" }
 
@@ -86,7 +88,7 @@ unary = { unary_op  ~ factor }
 
 unary_op = { "-" | "!" | "+" }
 
-array_access = { ident ~ "[" ~ expression ~ "]" }
+array_access = _{ ident ~ "[" ~ expression ~ "]" }
 
 function_call = { ident ~ "(" ~ actual_parameters? ~ ")" }
 

@@ -17,7 +17,7 @@ use crate::{
     symbol_table::SymbolTable,
 };
 
-pub struct SyntaxResult {
+pub struct FullSyntaxTree {
     pub tree: SyntaxTree,
     pub symbol_table: SymbolTable,
 }
@@ -26,6 +26,8 @@ pub struct Visitor {
     builder: SyntaxBuilder,
 }
 
+pub type SyntaxResult = Result<SyntaxNode, SyntaxBuilderError>;
+
 impl Visitor {
     pub fn new() -> Self {
         Self {
@@ -33,7 +35,7 @@ impl Visitor {
         }
     }
 
-    pub fn result(self) -> SyntaxResult {
+    pub fn result(self) -> FullSyntaxTree {
         self.builder.result()
     }
 
@@ -69,6 +71,8 @@ impl Visitor {
         self.add_builtins();
     }
 
+    /// Register a function and return its [SymbolId],
+    /// or an error if it is already defined.
     pub fn visit_func_start(
         &mut self,
         func_symbol: Symbol,
@@ -90,6 +94,9 @@ impl Visitor {
         })
     }
 
+    /// Declare a new variable and return its [SymbolId].
+    /// Returns an error if the variable has already been declared in this scope.
+    /// TODO: Mentions parameter shadowing in error if applicable
     pub fn visit_var_decl(
         &mut self,
         name: SymbolName,
@@ -126,7 +133,7 @@ impl Visitor {
         &mut self,
         name: &SymbolName,
         mut actual_args: Vec<SyntaxNode>,
-    ) -> Result<SyntaxNode, SyntaxBuilderError> {
+    ) -> SyntaxResult {
         let (func, id) = self.builder.get_symbol_by_name(name).ok_or_else(|| {
             SyntaxBuilderError::from(format!("Cannot find function with name `{}`", name))
         })?;
@@ -188,7 +195,7 @@ impl Visitor {
         Ok(func_node)
     }
 
-    pub fn visit_number(&mut self, number: String) -> Result<SyntaxNode, SyntaxBuilderError> {
+    pub fn visit_number(&mut self, number: String) -> SyntaxResult {
         let node = if let Ok(num) = number.parse::<i8>() {
             SyntaxNode::Constant {
                 node_type: NodeType::Num,
@@ -237,8 +244,16 @@ impl Visitor {
     }
 
     pub fn visit_return(&mut self, ret_node: Option<SyntaxNode>) -> SyntaxNode {
-        // TODO: coercions
-        if let Some(ret_node) = ret_node {
+        if let Some(mut ret_node) = ret_node {
+            let current_ret = self
+                .builder
+                .get_current_function()
+                .expect("Error: No current function set")
+                .return_type;
+            if ret_node.return_type() != current_ret {
+                ret_node =
+                    SyntaxNode::coerce(ret_node, current_ret).unwrap_or_else(SyntaxNode::from)
+            }
             SyntaxNode::Unary {
                 node_type: NodeType::Return,
                 return_type: ret_node.return_type(),
@@ -257,7 +272,7 @@ impl Visitor {
         &mut self,
         mut expression: SyntaxNode,
         statement: SyntaxNode,
-    ) -> Result<SyntaxNode, SyntaxBuilderError> {
+    ) -> SyntaxResult {
         if expression.return_type() != ReturnType::Bool {
             expression = SyntaxNode::coerce(expression, ReturnType::Bool)?;
         }
@@ -275,7 +290,7 @@ impl Visitor {
         mut condition: SyntaxNode,
         if_body: SyntaxNode,
         else_body: Option<SyntaxNode>,
-    ) -> Result<SyntaxNode, SyntaxBuilderError> {
+    ) -> SyntaxResult {
         let cond_ret = condition.return_type();
         if cond_ret != ReturnType::Bool {
             condition = SyntaxNode::coerce(condition, ReturnType::Bool)?;
@@ -298,42 +313,35 @@ impl Visitor {
         })
     }
 
-    pub fn visit_assignment(
-        &mut self,
-        lvar: SymbolName,
-        mut exp: SyntaxNode,
-    ) -> Result<SyntaxNode, SyntaxBuilderError> {
-        let (symbol, id) = self.builder.get_symbol_by_name(&lvar).ok_or_else(|| {
-            SyntaxBuilderError(format!(
-                "Variable {} does not exist in the current scope",
-                lvar
-            ))
-        })?;
-        let ret_type = symbol.return_type;
+    pub fn visit_assignment(&mut self, lvar: SyntaxNode, mut exp: SyntaxNode) -> SyntaxResult {
+        // let symbol = self.builder.get_symbol_by_id(&lvar).ok_or_else(|| {
+        //     SyntaxBuilderError(format!(
+        //         "Variable with id {} does not exist in the current scope",
+        //         lvar
+        //     ))
+        // })?;
+
+        let ret_type = lvar.return_type();
 
         if exp.return_type() != ret_type {
             exp = SyntaxNode::coerce(exp, ret_type)?;
         }
-        let id = SyntaxNode::Symbol {
-            node_type: NodeType::Id,
-            return_type: ret_type,
-            symbol_id: id,
-        };
+        // let id_node = SyntaxNode::Symbol {
+        //     node_type: NodeType::Id,
+        //     return_type: ret_type,
+        //     symbol_id: lvar,
+        // };
         let node = SyntaxNode::Binary {
             node_type: NodeType::Assignment,
             return_type: ret_type,
-            left: Some(Box::new(id)),
+            left: Some(Box::new(lvar)),
             right: Some(Box::new(exp)),
         };
 
         Ok(node)
     }
 
-    pub fn visit_unary(
-        &mut self,
-        mut op: SyntaxNode,
-        unary_child: SyntaxNode,
-    ) -> Result<SyntaxNode, SyntaxBuilderError> {
+    pub fn visit_unary(&mut self, mut op: SyntaxNode, unary_child: SyntaxNode) -> SyntaxResult {
         let op_type = op.node_type();
         if let SyntaxNode::Unary {
             ref mut child,
@@ -396,5 +404,42 @@ impl Visitor {
             )));
         }
         Ok(())
+    }
+
+    pub fn visit_lvariable(&self, name: &SymbolName) -> SyntaxResult {
+        let (symbol, id) = self.builder.get_symbol_by_name(name).ok_or_else(|| {
+            SyntaxBuilderError(format!("Error: Symbol `{}` is not defined", name))
+        })?;
+        let node = SyntaxNode::Symbol {
+            node_type: NodeType::Id,
+            return_type: symbol.return_type,
+            symbol_id: id,
+        };
+        Ok(node)
+    }
+
+    pub fn visit_larray(&self, name: &SymbolName, expr: SyntaxNode) -> SyntaxResult {
+        let (symbol, id) = self
+            .builder
+            .get_symbol_by_name(name)
+            .ok_or_else(|| SyntaxBuilderError(format!("Symbol `{}` is not defined", name)))?;
+        if !symbol.is_array() {
+            return Err(SyntaxBuilderError(format!(
+                "Symbol {} is not an array",
+                name
+            )));
+        }
+        let id_node = SyntaxNode::Symbol {
+            node_type: NodeType::Id,
+            return_type: symbol.return_type,
+            symbol_id: id,
+        };
+        let access_node = SyntaxNode::Binary {
+            node_type: NodeType::LArray,
+            return_type: symbol.return_type,
+            left: Some(Box::new(id_node)),
+            right: Some(Box::new(expr)),
+        };
+        Ok(access_node)
     }
 }

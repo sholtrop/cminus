@@ -1,4 +1,5 @@
 use std::io;
+use syntax::{FullSyntaxTree, NodeType};
 use tests::{collect_tests_in_path, run_single_test, TestStats};
 
 const PROGRAM_TEST_PATH: &str = "tests/testfiles/general/programs";
@@ -9,7 +10,27 @@ pub fn test_function(input: &str) -> Result<(), &str> {
     let parsed = lexical::parse(input).unwrap_or_else(|_| {
         panic!("Could not lexically parse file for syntax test");
     });
-    syntax::generate(parsed).and(Ok(())).or(Err("Failed"))
+    let result = syntax::generate(parsed);
+    if let Err(err) = result {
+        log::error!("{}", err);
+        return Err("Error occurred");
+    }
+    let FullSyntaxTree { tree, .. } = result.unwrap();
+    for (id, func) in tree.functions {
+        for node in func
+            .tree
+            .ok_or_else(|| {
+                log::error!("Rootless function {}", id);
+                "Error occurred"
+            })?
+            .preorder()
+        {
+            if node.node_type() == NodeType::Error {
+                return Err("Error node found");
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn run() -> io::Result<()> {

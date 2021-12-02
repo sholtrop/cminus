@@ -11,7 +11,7 @@ use crate::{
     symbol::{ReturnType, Symbol, SymbolType},
     symbol_table::{SymbolScope, SymbolTable},
     syntax_tree::{FunctionRoot, SyntaxTree},
-    visitor::{SyntaxResult, Visitor},
+    visitor::{FullSyntaxTree, Visitor},
 };
 
 pub struct SyntaxBuilder {
@@ -32,16 +32,19 @@ impl SyntaxBuilder {
     }
 
     /// Return the produced [SyntaxResult]. This consumes the `self` value of the [SyntaxBuilder].
-    pub fn result(self) -> SyntaxResult {
-        SyntaxResult {
+    pub fn result(self) -> FullSyntaxTree {
+        FullSyntaxTree {
             symbol_table: self.table,
             tree: self.tree,
         }
     }
+
+    /// Register a new function and return its [SymbolId].
+    /// Returns an error if a function with the given name is already defined.
     fn add_function(&mut self, symbol: Symbol) -> Result<SymbolId, SyntaxBuilderError> {
         if self.scope_manager.symbol_is_defined(&symbol.name) {
             return Err(
-                format!("Function {} redefined in current scope", symbol.name)
+                format!("Function with name {} is already defined", symbol.name)
                     .as_str()
                     .into(),
             );
@@ -66,13 +69,13 @@ impl SyntaxBuilder {
         self.current_function = None;
     }
 
-    pub fn get_symbol_by_id(&self, id: SymbolId) -> Option<&Symbol> {
-        self.table.get_symbol(&id)
+    pub fn get_symbol_by_id(&self, id: &SymbolId) -> Option<&Symbol> {
+        self.table.get_symbol(id)
     }
 
     pub fn get_symbol_by_name(&self, name: &SymbolName) -> Option<(&Symbol, SymbolId)> {
         let id = self.get_symbol_id(name)?;
-        let symbol = self.get_symbol_by_id(id).unwrap_or_else(|| {
+        let symbol = self.get_symbol_by_id(&id).unwrap_or_else(|| {
             panic!(
                 "SymbolId {:?} was found by the scope manager but was not in the symbol table",
                 id
@@ -85,8 +88,12 @@ impl SyntaxBuilder {
         self.scope_manager.get_symbol_id(name)
     }
 
-    pub fn get_current_function(&self) -> Option<SymbolId> {
-        self.current_function
+    pub fn get_current_function(&self) -> Option<&Symbol> {
+        if let Some(id) = self.current_function {
+            self.get_symbol_by_id(&id)
+        } else {
+            None
+        }
     }
 
     pub fn attach_root(
@@ -112,9 +119,7 @@ impl SyntaxBuilder {
 
     pub fn add_symbol(&mut self, symbol: Symbol) -> Result<SymbolId, SyntaxBuilderError> {
         if self.scope_manager.symbol_is_defined(&symbol.name) {
-            return Err(format!("Symbol {} redefined in current scope", symbol.name)
-                .as_str()
-                .into());
+            return Err(format!("Symbol {} redefined in current scope", symbol.name).into());
         }
 
         let scope = if let Some(id) = self.current_function {

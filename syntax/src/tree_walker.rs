@@ -25,6 +25,12 @@ pub enum ParserValue {
     End,
 }
 
+impl From<SyntaxBuilderError> for ParserValue {
+    fn from(e: SyntaxBuilderError) -> Self {
+        Self::Node(SyntaxNode::create_error(e.to_string()))
+    }
+}
+
 pub struct TreeWalker {
     current_line: usize,
     current_decl_type: Option<ReturnType>,
@@ -44,18 +50,16 @@ impl TreeWalker {
         visitor: &mut Visitor,
     ) -> Result<(), SyntaxBuilderError> {
         for rule in parse_tree {
-            self.walk_tree(Some(rule), visitor)?;
+            if let ParserValue::Node(err) = self.walk_tree(Some(rule), visitor) {
+                log::error!("{}", err);
+            }
         }
         Ok(())
     }
 
-    fn walk_tree(
-        &mut self,
-        parse_node: Option<ParseNode>,
-        visitor: &mut Visitor,
-    ) -> Result<ParserValue, SyntaxBuilderError> {
+    fn walk_tree(&mut self, parse_node: Option<ParseNode>, visitor: &mut Visitor) -> ParserValue {
         if parse_node.is_none() {
-            return Ok(ParserValue::End);
+            return ParserValue::End;
         }
         let parse_node = parse_node.unwrap();
         log::trace!("{:?}", parse_node.as_rule());
@@ -63,67 +67,79 @@ impl TreeWalker {
             Rule::program => {
                 visitor.program_start();
                 for node in parse_node.into_inner() {
-                    self.walk_tree(Some(node), visitor)?;
+                    self.walk_tree(Some(node), visitor);
                 }
-                Ok(ParserValue::End)
+                ParserValue::End
             }
             Rule::fn_declaration => {
                 let mut nodes = parse_node.into_inner();
                 let return_type = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::ReturnType(rt) => break rt,
                         ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Expected function return type")),
+                        _ => panic!("Expected function return type"),
                     };
                 };
                 let name = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Name(name) => break name,
                         ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Expected function name")),
+                        _ => panic!("Expected function name"),
                     };
                 };
-                let id = visitor.visit_func_start(Symbol {
+                let id = match visitor.visit_func_start(Symbol {
                     name,
                     return_type,
                     symbol_type: SymbolType::Function,
                     line: self.current_line,
-                })?;
+                }) {
+                    Ok(id) => id,
+                    Err(e) => {
+                        return e.into();
+                    }
+                };
                 // Param declaration is handled in Rule::Param
                 // We do need to check if that worked correctly, but don't need the return value
                 loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
-                        ParserValue::Ids(_) | ParserValue::None => break,
+                    match self.walk_tree(nodes.next(), visitor) {
+                        ParserValue::Ids(ids) => {
+                            log::trace!("Func parameters added: {:?}", ids);
+                            break;
+                        }
+                        ParserValue::None => break,
                         ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Expected function parameters")),
+                        _ => panic!("Expected function parameters"),
                     };
                 }
                 let func_body = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(body) => break body,
                         ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Expected function body")),
+                        _ => unreachable!("Expected function body"), // return Err("Expected function body".into()),
                     };
                 };
-                visitor.visit_func_end(&id, func_body)?;
-                Ok(ParserValue::Skip)
+                if let Err(e) = visitor.visit_func_end(&id, func_body) {
+                    e.into()
+                } else {
+                    ParserValue::Skip
+                }
             }
             Rule::var_declaration => {
                 let mut nodes = parse_node.into_inner();
                 let type_spec = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::ReturnType(rt) => break rt,
                         ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Expected type specifier")),
+                        _ => unreachable!("Expected type specifier"),
                     };
                 };
                 self.current_decl_type = Some(type_spec);
                 loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
-                        ParserValue::Nodes(nodes) => return Ok(ParserValue::Nodes(nodes)),
-                        ParserValue::None => return Ok(ParserValue::None),
+                    match self.walk_tree(nodes.next(), visitor) {
+                        ParserValue::Nodes(nodes) => return ParserValue::Nodes(nodes),
+                        ParserValue::None => return ParserValue::None,
                         ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Expected var names")),
+                        _ => unreachable!("Expected var names"),
                     }
                 }
             }
@@ -131,181 +147,176 @@ impl TreeWalker {
                 let mut nodes = parse_node.into_inner();
                 let mut assignments = vec![];
                 loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         // Declaration with assignment
                         ParserValue::Node(n) => assignments.push(n),
                         ParserValue::End => break,
                         // Only a declaration, no assignment
                         ParserValue::None | ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Did not find var_decl nodes")),
+                        _ => unreachable!("Did not find var_decl nodes"),
                     }
                 }
                 self.current_decl_type = None;
-                Ok(ParserValue::Nodes(assignments))
+                ParserValue::Nodes(assignments)
             }
             Rule::var_decl_maybe_init => {
-                let decl_type = self.current_decl_type.ok_or_else(|| {
-                    SyntaxBuilderError::from("No type specifier set for declaration list")
-                })?;
+                let decl_type = self
+                    .current_decl_type
+                    .expect("No type specifier set for declaration list");
                 let mut nodes = parse_node.into_inner();
-                let mut current_name: Option<SymbolName> = None;
+                let mut current_id: Option<SyntaxNode> = None;
                 let mut assignment: Option<SyntaxNode> = None;
                 loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Name(name) => {
-                            current_name = Some(name.clone());
-                            visitor.visit_var_decl(name, decl_type, self.current_line)?;
+                            let id =
+                                match visitor.visit_var_decl(name, decl_type, self.current_line) {
+                                    Ok(id) => id,
+                                    Err(e) => return e.into(),
+                                };
+                            current_id = Some(SyntaxNode::Symbol {
+                                node_type: NodeType::Id,
+                                return_type: decl_type,
+                                symbol_id: id,
+                            });
                         }
-                        ParserValue::Node(exp) => {
-                            if let Some(var) = current_name.clone() {
-                                assignment = Some(visitor.visit_assignment(var, exp)?);
+                        ParserValue::Node(node) => {
+                            if let Some(var) = current_id.clone() {
+                                assignment = match visitor.visit_assignment(var, node) {
+                                    Ok(n) => Some(n),
+                                    Err(e) => return e.into(),
+                                }
                             } else {
-                                log::warn!(
-                                    "Could not visit assignment because `current_name` was None"
-                                );
+                                panic!("Invariant violated: Assignment expression without id to assign to")
                             }
                         }
                         ParserValue::Skip => continue,
                         ParserValue::End => break,
-                        _ => {
-                            return Err(SyntaxBuilderError::from(
-                                "Expected var identifier / assign expression",
-                            ))
-                        }
+                        _ => unreachable!("Expected var identifier / assign expression"),
                     }
                 }
                 if let Some(assignment) = assignment {
-                    Ok(ParserValue::Node(assignment))
+                    ParserValue::Node(assignment)
                 } else {
-                    Ok(ParserValue::None)
+                    ParserValue::None
                 }
             }
             Rule::formal_parameters => {
                 let mut nodes = parse_node.into_inner();
                 let mut params = vec![];
                 loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::ReturnType(void) => {
                             if void == ReturnType::Void {
                                 break;
                             } else {
-                                return Err(SyntaxBuilderError::from(
-                                    "Expected identifier as name for param",
-                                ));
+                                panic!("Expected identifier as name for param",);
                             }
                         }
                         ParserValue::Id(param_id) => params.push(param_id),
                         ParserValue::Skip => continue,
                         ParserValue::End => break,
                         _ => {
-                            return Err(SyntaxBuilderError::from(
-                                "Expected identifier as name for param",
-                            ));
+                            panic!("Expected identifier as name for param");
                         }
                     };
                 }
                 if params.is_empty() {
-                    Ok(ParserValue::None)
+                    ParserValue::None
                 } else {
-                    Ok(ParserValue::Ids(params))
+                    ParserValue::Ids(params)
                 }
             }
             Rule::parameter => {
                 let mut nodes = parse_node.into_inner();
                 let type_spec = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::ReturnType(rt) => break rt,
                         ParserValue::Skip => continue,
-                        _ => {
-                            return Err(SyntaxBuilderError::from(
-                                "Expected type specifier for param",
-                            ))
-                        }
+                        _ => panic!("Expected type specifier for param"),
                     };
                 };
                 let ident = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Name(name) => break name,
                         ParserValue::Skip => continue,
-                        _ => {
-                            return Err(SyntaxBuilderError::from(
-                                "Expected identifier as name for param",
-                            ))
-                        }
+                        _ => panic!("Expected identifier as name for param"),
                     };
                 };
-                let id = visitor.visit_param_decl(ident, type_spec, self.current_line)?;
-                Ok(ParserValue::Id(id))
+                let id = match visitor.visit_param_decl(ident, type_spec, self.current_line) {
+                    Ok(id) => id,
+                    Err(e) => return e.into(),
+                };
+                ParserValue::Id(id)
             }
-            Rule::void => Ok(ParserValue::ReturnType(ReturnType::Void)),
+            Rule::void => ParserValue::ReturnType(ReturnType::Void),
             Rule::compound_stmt => {
                 visitor.add_local_scope();
                 let mut nodes = parse_node.into_inner();
                 let mut statements = vec![];
                 loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(node) => statements.push(node),
                         ParserValue::Nodes(mut nodes) => statements.append(&mut nodes),
                         ParserValue::None => continue,
                         ParserValue::Skip => continue,
                         ParserValue::End => break,
-                        _ => return Err(SyntaxBuilderError::from("Expected statement")),
+                        _ => unreachable!("Expected statement"),
                     };
                 }
                 let root = visitor.visit_statement_list(statements);
                 visitor.leave_local_scope();
-                Ok(ParserValue::Node(root))
+                ParserValue::Node(root)
             }
             Rule::function_call => {
                 let mut nodes = parse_node.into_inner();
-                let params = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
-                        ParserValue::Nodes(n) => break n,
-                        ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Expected actual parameters")),
-                    };
-                };
                 let func_name = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Name(name) => break name,
                         ParserValue::Skip => continue,
-                        _ => {
-                            return Err(SyntaxBuilderError::from(
-                                "Expected identifier as function name",
-                            ))
-                        }
+                        _ => unreachable!("Expected identifier as function name"),
                     };
                 };
-                let func_call_node = visitor.visit_func_call(&func_name, params)?;
-                Ok(ParserValue::Node(func_call_node))
+                let params = loop {
+                    match self.walk_tree(nodes.next(), visitor) {
+                        ParserValue::Nodes(n) => break n,
+                        ParserValue::Skip => continue,
+                        _ => unreachable!("Expected actual parameters"),
+                    };
+                };
+                let func_call_node = match visitor.visit_func_call(&func_name, params) {
+                    Ok(n) => n,
+                    Err(e) => return e.into(),
+                };
+                ParserValue::Node(func_call_node)
             }
             Rule::actual_parameters => {
                 let mut nodes = parse_node.into_inner();
                 let mut params = vec![];
                 loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(node) => params.push(node),
                         ParserValue::Skip => continue,
                         ParserValue::End | ParserValue::None => break,
-                        _ => return Err(SyntaxBuilderError::from("Expected expression")),
+                        _ => unreachable!("Expected expression"),
                     };
                 }
-                Ok(ParserValue::Nodes(params))
+                ParserValue::Nodes(params)
             }
             Rule::type_specifier => {
                 let rtype: ReturnType = parse_node.as_str().into();
-                Ok(ParserValue::ReturnType(rtype))
+                ParserValue::ReturnType(rtype)
             }
             Rule::number => {
                 let parse_node = parse_node.as_str().to_string();
                 let res = visitor
                     .visit_number(parse_node)
                     .unwrap_or_else(SyntaxNode::from);
-                Ok(ParserValue::Node(res))
+                ParserValue::Node(res)
             }
             Rule::ident => {
                 let ident = SymbolName::from(parse_node.as_str());
-                Ok(ParserValue::Name(ident))
+                ParserValue::Name(ident)
             }
             Rule::infix_op => {
                 use NodeType::*;
@@ -332,59 +343,50 @@ impl TreeWalker {
                     left: None,
                     right: None,
                 };
-                Ok(ParserValue::Node(node))
+                ParserValue::Node(node)
             }
             Rule::return_stmt => {
                 let mut nodes = parse_node.into_inner();
                 let return_exp = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(n) => break Some(n),
                         ParserValue::End => break None,
                         ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Expected return expression")),
+                        _ => unreachable!("Expected return expression"),
                     };
                 };
                 let return_node = visitor.visit_return(return_exp);
-                Ok(ParserValue::Node(return_node))
+                ParserValue::Node(return_node)
             }
             Rule::selection_stmt => {
                 let mut nodes = parse_node.into_inner();
                 let if_exp = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(n) => break n,
                         ParserValue::Skip => continue,
-                        _ => {
-                            return Err(SyntaxBuilderError::from(
-                                "Expected expression node for if-statement test",
-                            ))
-                        }
+                        _ => unreachable!("Expected expression node for if-statement test"),
                     }
                 };
                 let if_body = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(n) => break n,
                         ParserValue::Skip => continue,
-                        _ => {
-                            return Err(SyntaxBuilderError::from(
-                                "Expected statement node for if-statement body",
-                            ))
-                        }
+                        _ => unreachable!("Expected statement node for if-statement body"),
                     }
                 };
                 let else_body = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(n) => break Some(n),
                         ParserValue::End => break None,
                         ParserValue::Skip => continue,
-                        _ => {
-                            return Err(SyntaxBuilderError::from(
-                                "Expected statement node for if-statement body",
-                            ))
-                        }
+                        _ => unreachable!("Expected statement node for if-statement body"),
                     }
                 };
-                let if_node = visitor.visit_if(if_exp, if_body, else_body)?;
-                Ok(ParserValue::Node(if_node))
+                let if_node = match visitor.visit_if(if_exp, if_body, else_body) {
+                    Ok(n) => n,
+                    Err(e) => return e.into(),
+                };
+                ParserValue::Node(if_node)
             }
             Rule::expression => {
                 log::trace!("Enter expression `{}`", parse_node.as_str());
@@ -392,10 +394,6 @@ impl TreeWalker {
                     .into_inner()
                     .filter_map(|node| {
                         let res = self.walk_tree(Some(node), visitor);
-                        if let Err(e) = res {
-                            return Some(SyntaxNode::from(e));
-                        }
-                        let res = res.unwrap();
                         match res {
                             ParserValue::Node(n) => Some(n),
                             ParserValue::Skip => None,
@@ -424,61 +422,104 @@ impl TreeWalker {
                     );
                     let new_left = list.remove(highest_idx - 1).unwrap();
                     let new_right = list.remove(highest_idx - 1).unwrap();
-                    visitor.visit_binary(new_left, &mut highest_prec, new_right)?;
+                    if let Err(e) = visitor.visit_binary(new_left, &mut highest_prec, new_right) {
+                        return e.into();
+                    }
                     list.insert(highest_idx - 1, highest_prec);
                 }
-                Ok(ParserValue::Node(list.pop_front().unwrap()))
+                ParserValue::Node(list.pop_front().unwrap())
             }
-            Rule::var => {
-                let var = SymbolName::from(parse_node.as_str());
-                // TODO: visit l/r variable
-                Ok(ParserValue::Name(var))
+            Rule::assignment => {
+                let mut nodes = parse_node.into_inner();
+                let lvar = loop {
+                    match self.walk_tree(nodes.next(), visitor) {
+                        ParserValue::Node(n) => break n,
+                        ParserValue::Skip => continue,
+                        _ => unreachable!("Expected lvariable"),
+                    }
+                };
+                let expr = loop {
+                    match self.walk_tree(nodes.next(), visitor) {
+                        ParserValue::Node(n) => break n,
+                        ParserValue::Skip => continue,
+                        _ => unreachable!("Expected assignment expression"),
+                    }
+                };
+                let assignment = match visitor.visit_assignment(lvar, expr) {
+                    Ok(n) => n,
+                    Err(e) => return e.into(),
+                };
+                ParserValue::Node(assignment)
+            }
+            Rule::lvar | Rule::rvar => {
+                let mut nodes = parse_node.into_inner();
+                let mut access_exp: Option<SyntaxNode> = None;
+                let mut name: Option<SymbolName> = None;
+                loop {
+                    match self.walk_tree(nodes.next(), visitor) {
+                        ParserValue::Name(n) => name = Some(n),
+                        ParserValue::Node(exp) => access_exp = Some(exp),
+                        ParserValue::End => break,
+                        ParserValue::Skip => continue,
+                        _ => unreachable!("Expected identifier"),
+                    }
+                }
+                let name = name.unwrap();
+                let id_node = if let Some(array_access) = access_exp {
+                    visitor.visit_larray(&name, array_access)
+                } else {
+                    visitor.visit_lvariable(&name)
+                };
+                match id_node {
+                    Ok(n) => ParserValue::Node(n),
+                    Err(e) => e.into(),
+                }
             }
             Rule::iteration_stmt => {
                 let mut nodes = parse_node.into_inner();
                 let condition = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(exp) => break exp,
                         ParserValue::Skip => continue,
                         _ => {
-                            return Err(SyntaxBuilderError::from(
-                                "Expected condition expression for while loop",
-                            ))
+                            unreachable!("Expected condition expression for while loop")
                         }
                     }
                 };
                 let statement = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(stmt) => break stmt,
                         ParserValue::Skip => continue,
                         _ => {
-                            return Err(SyntaxBuilderError::from(
-                                "Expected statement for while loop",
-                            ))
+                            unreachable!("Expected statement for while loop")
                         }
                     }
                 };
-                let while_node = visitor.visit_while(condition, statement)?;
-                Ok(ParserValue::Node(while_node))
+                match visitor.visit_while(condition, statement) {
+                    Ok(n) => ParserValue::Node(n),
+                    Err(e) => e.into(),
+                }
             }
             Rule::unary => {
                 let mut nodes = parse_node.into_inner();
                 let unary_op = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(n) => break n,
                         ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Expected node")),
+                        _ => unreachable!("Expected node"),
                     }
                 };
                 let unary_child = loop {
-                    match self.walk_tree(nodes.next(), visitor)? {
+                    match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(n) => break n,
                         ParserValue::Skip => continue,
-                        _ => return Err(SyntaxBuilderError::from("Expected node")),
+                        _ => unreachable!("Expected node"),
                     }
                 };
-                let result = visitor.visit_unary(unary_op, unary_child)?;
-                Ok(ParserValue::Node(result))
+                match visitor.visit_unary(unary_op, unary_child) {
+                    Ok(n) => ParserValue::Node(n),
+                    Err(e) => e.into(),
+                }
             }
             Rule::unary_op => {
                 let return_val = SyntaxNode::Unary {
@@ -491,7 +532,7 @@ impl TreeWalker {
                         _ => unreachable!(),
                     },
                 };
-                Ok(ParserValue::Node(return_val))
+                ParserValue::Node(return_val)
             }
             Rule::COMMENT | Rule::WHITESPACE => {
                 // We can never enter the newline rule, so we manually count newlines in whitespace/comments
@@ -503,17 +544,16 @@ impl TreeWalker {
                     }
                 });
                 self.current_line += newlines;
-                Ok(ParserValue::Skip)
+                ParserValue::Skip
             }
-            Rule::EOI => Ok(ParserValue::Skip),
+            Rule::EOI => ParserValue::Skip,
             _ => {
-                log::warn!(
+                unreachable!(
                     "Unimplemented rule `{:?}`:\n{}. {}",
                     parse_node.as_rule(),
                     self.current_line,
                     parse_node.as_str()
                 );
-                Ok(ParserValue::Skip)
             }
         }
     }

@@ -139,6 +139,18 @@ pub struct Symbol {
     pub line: usize,
 }
 
+impl Symbol {
+    pub fn is_array(&self) -> bool {
+        match self.return_type {
+            ReturnType::Int8Array
+            | ReturnType::IntArray
+            | ReturnType::Uint8Array
+            | ReturnType::UintArray => true,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for Symbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(

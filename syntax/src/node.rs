@@ -1,4 +1,4 @@
-use crate::{error::SyntaxBuilderError, id::SymbolId, symbol::ReturnType};
+use crate::{error::SyntaxBuilderError, id::SymbolId, symbol::ReturnType, visitor::SyntaxResult};
 use core::fmt;
 use ptree::TreeItem;
 use std::{borrow::Cow, ops::Deref};
@@ -211,7 +211,7 @@ impl SyntaxNode {
 
     /// Attempt to coerce [SyntaxNode] `from` to [ReturnType] `to`
     /// If the coercion is valid, will return a unary coercion [SyntaxNode] with the `from` node as its child.
-    pub fn coerce(from: SyntaxNode, to: ReturnType) -> Result<SyntaxNode, SyntaxBuilderError> {
+    pub fn coerce(from: SyntaxNode, to: ReturnType) -> SyntaxResult {
         let from_ret_t = from.return_type();
         assert_ne!(from_ret_t, to);
         if to == ReturnType::Bool {
