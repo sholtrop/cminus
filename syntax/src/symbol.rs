@@ -90,7 +90,7 @@ impl From<&str> for ReturnType {
 }
 
 impl ReturnType {
-    fn to_array_type(&self) -> Self {
+    pub fn to_array_type(&self) -> Self {
         match *self {
             Self::Int => Self::IntArray,
             Self::Int8 => Self::Int8Array,
@@ -111,6 +111,8 @@ pub enum SymbolType {
     Program,
     TempVar,
     Label,
+    ArrayVariable { size: usize },
+    ArrayParam { size: usize },
 }
 
 impl fmt::Display for SymbolType {
@@ -127,6 +129,8 @@ impl fmt::Display for SymbolType {
                 SymbolType::Program => "program",
                 SymbolType::TempVar => "tempvar",
                 SymbolType::Label => "label",
+                SymbolType::ArrayVariable { size } => format!("arrayvar({})", size),
+                SymbolType::ArrayParam { size } => format!("arrayparam({})", size),
             }
         )
     }

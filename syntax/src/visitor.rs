@@ -418,7 +418,7 @@ impl Visitor {
         Ok(())
     }
 
-    pub fn visit_lvariable(&self, name: &SymbolName) -> SyntaxResult {
+    pub fn visit_variable(&self, name: &SymbolName) -> SyntaxResult {
         let (symbol, id) = self.builder.get_symbol_by_name(name).ok_or_else(|| {
             SyntaxBuilderError(format!("Error: Symbol `{}` is not defined", name))
         })?;
@@ -430,7 +430,7 @@ impl Visitor {
         Ok(node)
     }
 
-    pub fn visit_larray(&self, name: &SymbolName, expr: SyntaxNode) -> SyntaxResult {
+    pub fn visit_array_access(&self, name: &SymbolName, expr: SyntaxNode) -> SyntaxResult {
         let (symbol, id) = self
             .builder
             .get_symbol_by_name(name)
@@ -453,5 +453,22 @@ impl Visitor {
             right: Some(Box::new(expr)),
         };
         Ok(access_node)
+    }
+
+    pub fn visit_array_decl(
+        &mut self,
+        name: SymbolName,
+        size: SyntaxNode,
+        base_type: ReturnType,
+        line: usize,
+    ) -> Result<SymbolId, SyntaxBuilderError> {
+        let arr_symbol = Symbol {
+            line,
+            name,
+            return_type: base_type.to_array_type(),
+            symbol_type: SymbolType::Variable,
+        };
+        let id = self.builder.add_symbol(arr_symbol)?;
+        Ok(id)
     }
 }

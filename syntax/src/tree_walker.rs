@@ -201,6 +201,21 @@ impl TreeWalker {
                     ParserValue::None
                 }
             }
+            Rule::array_decl => {
+                let mut nodes = parse_node.into_inner();
+                let mut ident: Option<SymbolName> = None;
+                let mut size: Option<SyntaxNode> = None;
+                loop {
+                    match self.walk_tree(nodes.next(), visitor) {
+                        ParserValue::Name(name) => ident = Some(name),
+                        ParserValue::Node(n) => size = Some(n),
+                        ParserValue::End => break,
+                        _ => unreachable!("Expected array ident or size"),
+                    }
+                }
+                visitor.visit_array_decl(ident, size);
+                ParserValue::Skip
+            }
             Rule::formal_parameters => {
                 let mut nodes = parse_node.into_inner();
                 let mut params = vec![];
@@ -467,9 +482,9 @@ impl TreeWalker {
                 }
                 let name = name.unwrap();
                 let id_node = if let Some(array_access) = access_exp {
-                    visitor.visit_larray(&name, array_access)
+                    visitor.visit_array_access(&name, array_access)
                 } else {
-                    visitor.visit_lvariable(&name)
+                    visitor.visit_variable(&name)
                 };
                 match id_node {
                     Ok(n) => ParserValue::Node(n),
