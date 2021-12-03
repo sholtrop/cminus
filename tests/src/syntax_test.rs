@@ -1,5 +1,5 @@
 use std::io;
-use syntax::{FullSyntaxTree, NodeType, SyntaxNode};
+use syntax::{NodeType, SyntaxAnalysisResult, SyntaxNode};
 use tests::{collect_tests_in_path, run_single_test, TestStats};
 
 const PROGRAM_TEST_PATH: &str = "tests/testfiles/general/programs";
@@ -15,7 +15,7 @@ pub fn test_function(input: &str) -> Result<(), &str> {
         log::error!("{}", err);
         return Err("Error occurred");
     }
-    let FullSyntaxTree { tree, .. } = result.unwrap();
+    let SyntaxAnalysisResult { tree, .. } = result.unwrap();
     for (id, func) in tree.functions {
         for node in func
             .tree

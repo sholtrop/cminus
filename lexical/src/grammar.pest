@@ -34,11 +34,15 @@ void = { "void" }
 
 type_specifier = { "unsigned int" | "uint8_t" | "int8_t" | "int" | "unsigned" }
 
-formal_parameters = { parameter+ | void }
+formal_parameters = { any_parameter ~ ("," ~ any_parameter)* | void }
 
 lvar = { !keyword ~ (array_access | ident) }
 
-parameter = { type_specifier ~ ident ~ "[]"? ~ ","? }
+any_parameter = _{ array_parameter | parameter }
+
+parameter = { type_specifier ~ ident }
+
+array_parameter = { type_specifier ~ ident ~ "[" ~ "]" }
 
 compound_stmt = { "{" ~ statement_list ~ "}" }
 

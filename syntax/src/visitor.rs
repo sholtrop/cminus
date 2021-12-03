@@ -17,7 +17,7 @@ use crate::{
     symbol_table::SymbolTable,
 };
 
-pub struct FullSyntaxTree {
+pub struct SyntaxAnalysisResult {
     pub tree: SyntaxTree,
     pub symbol_table: SymbolTable,
 }
@@ -35,7 +35,7 @@ impl Visitor {
         }
     }
 
-    pub fn result(self) -> FullSyntaxTree {
+    pub fn result(self) -> SyntaxAnalysisResult {
         self.builder.result()
     }
 
@@ -458,15 +458,52 @@ impl Visitor {
     pub fn visit_array_decl(
         &mut self,
         name: SymbolName,
-        size: SyntaxNode,
+        arr_size: SyntaxNode,
         base_type: ReturnType,
         line: usize,
     ) -> Result<SymbolId, SyntaxBuilderError> {
+        let size = match arr_size {
+            SyntaxNode::Constant { value, .. } => {
+                let value = i64::from(value);
+                if value < 1 {
+                    return Err("Array size must be greater than 0".into());
+                }
+                value as usize
+            }
+            _ => return Err("`size` was not a Constant number SyntaxNode".into()),
+        };
         let arr_symbol = Symbol {
             line,
             name,
             return_type: base_type.to_array_type(),
-            symbol_type: SymbolType::Variable,
+            symbol_type: SymbolType::ArrayVariable { size },
+        };
+        let id = self.builder.add_symbol(arr_symbol)?;
+        Ok(id)
+    }
+
+    pub fn visit_array_param_decl(
+        &mut self,
+        name: SymbolName,
+        arr_size: SyntaxNode,
+        base_type: ReturnType,
+        line: usize,
+    ) -> Result<SymbolId, SyntaxBuilderError> {
+        let size = match arr_size {
+            SyntaxNode::Constant { value, .. } => {
+                let value = i64::from(value);
+                if value < 1 {
+                    return Err("Array size must be greater than 0".into());
+                }
+                value as usize
+            }
+            _ => return Err("`size` was not a constant number SyntaxNode".into()),
+        };
+        let arr_symbol = Symbol {
+            line,
+            name,
+            return_type: base_type.to_array_type(),
+            symbol_type: SymbolType::ArrayParam { size },
         };
         let id = self.builder.add_symbol(arr_symbol)?;
         Ok(id)

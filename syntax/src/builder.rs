@@ -11,7 +11,7 @@ use crate::{
     symbol::{ReturnType, Symbol, SymbolType},
     symbol_table::{SymbolScope, SymbolTable},
     syntax_tree::{FunctionRoot, SyntaxTree},
-    visitor::{FullSyntaxTree, Visitor},
+    visitor::{SyntaxAnalysisResult, Visitor},
 };
 
 pub struct SyntaxBuilder {
@@ -32,8 +32,8 @@ impl SyntaxBuilder {
     }
 
     /// Return the produced [SyntaxResult]. This consumes the `self` value of the [SyntaxBuilder].
-    pub fn result(self) -> FullSyntaxTree {
-        FullSyntaxTree {
+    pub fn result(self) -> SyntaxAnalysisResult {
+        SyntaxAnalysisResult {
             symbol_table: self.table,
             tree: self.tree,
         }

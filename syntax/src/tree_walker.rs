@@ -152,7 +152,7 @@ impl TreeWalker {
                         ParserValue::Node(n) => assignments.push(n),
                         ParserValue::End => break,
                         // Only a declaration, no assignment
-                        ParserValue::None | ParserValue::Skip => continue,
+                        ParserValue::None | ParserValue::Skip | ParserValue::Id(_) => continue,
                         _ => unreachable!("Did not find var_decl nodes"),
                     }
                 }
@@ -201,25 +201,53 @@ impl TreeWalker {
                     ParserValue::None
                 }
             }
-            Rule::array_decl => {
+            Rule::array_decl | Rule::array_parameter => {
+                let is_param = parse_node.as_rule() == Rule::array_parameter;
                 let mut nodes = parse_node.into_inner();
                 let mut ident: Option<SymbolName> = None;
                 let mut size: Option<SyntaxNode> = None;
                 loop {
                     match self.walk_tree(nodes.next(), visitor) {
+                        ParserValue::ReturnType(rt) => self.current_decl_type = Some(rt),
                         ParserValue::Name(name) => ident = Some(name),
                         ParserValue::Node(n) => size = Some(n),
+                        ParserValue::Skip => continue,
                         ParserValue::End => break,
-                        _ => unreachable!("Expected array ident or size"),
+                        _ => unreachable!("Expected array type, ident or size"),
                     }
                 }
-                visitor.visit_array_decl(ident, size);
-                ParserValue::Skip
+                if let Some(ident) = ident {
+                    if let Some(size) = size {
+                        if is_param {
+                            return match visitor.visit_array_param_decl(
+                                ident,
+                                size,
+                                self.current_decl_type.expect("No declaration type set"),
+                                self.current_line,
+                            ) {
+                                Ok(id) => ParserValue::Id(id),
+                                Err(e) => ParserValue::Node(e.into()),
+                            };
+                        } else {
+                            return match visitor.visit_array_decl(
+                                ident,
+                                size,
+                                self.current_decl_type.expect("No declaration type set"),
+                                self.current_line,
+                            ) {
+                                Ok(id) => ParserValue::Id(id),
+                                Err(e) => ParserValue::Node(e.into()),
+                            };
+                        }
+                    }
+                }
+                ParserValue::Node(SyntaxNode::create_error("Missing array ident or size"))
             }
             Rule::formal_parameters => {
                 let mut nodes = parse_node.into_inner();
                 let mut params = vec![];
                 loop {
+                    // TODO: formal_parameters changed into normal/array param, change this loop as well
                     match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::ReturnType(void) => {
                             if void == ReturnType::Void {
