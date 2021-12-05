@@ -90,13 +90,23 @@ impl From<&str> for ReturnType {
 }
 
 impl ReturnType {
-    pub fn to_array_type(&self) -> Self {
-        match *self {
+    pub fn to_array_type(self) -> Self {
+        match self {
             Self::Int => Self::IntArray,
             Self::Int8 => Self::Int8Array,
             Self::Uint => Self::UintArray,
             Self::Uint8 => Self::Uint8Array,
             _ => Self::Error,
+        }
+    }
+
+    pub fn to_base_type(self) -> Self {
+        match self {
+            ReturnType::Int8Array => ReturnType::Int8,
+            ReturnType::Uint8Array => ReturnType::Uint8,
+            ReturnType::IntArray => ReturnType::Int,
+            ReturnType::UintArray => ReturnType::Uint,
+            _ => self,
         }
     }
 }

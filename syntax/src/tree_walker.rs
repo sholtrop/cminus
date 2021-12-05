@@ -34,7 +34,7 @@ impl From<SyntaxBuilderError> for ParserValue {
 pub struct TreeWalker {
     current_line: usize,
     current_decl_type: Option<ReturnType>,
-    params_added: bool,
+    is_func_body: bool,
 }
 
 impl TreeWalker {
@@ -42,7 +42,7 @@ impl TreeWalker {
         Self {
             current_line: 1,
             current_decl_type: None,
-            params_added: false,
+            is_func_body: false,
         }
     }
 
@@ -113,7 +113,6 @@ impl TreeWalker {
                         _ => panic!("Expected function parameters"),
                     };
                 }
-                self.params_added = false;
                 let func_body = loop {
                     match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(body) => break body,
@@ -185,10 +184,7 @@ impl TreeWalker {
                         }
                         ParserValue::Node(node) => {
                             if let Some(var) = current_id.clone() {
-                                assignment = match visitor.visit_assignment(var, node) {
-                                    Ok(n) => Some(n),
-                                    Err(e) => return e.into(),
-                                }
+                                assignment = Some(visitor.visit_assignment(var, node));
                             } else {
                                 panic!("Invariant violated: Assignment expression without id to assign to")
                             }
@@ -260,6 +256,7 @@ impl TreeWalker {
                 }
             }
             Rule::parameter | Rule::array_parameter => {
+                let is_array = parse_node.as_str().contains('[');
                 let mut nodes = parse_node.into_inner();
                 let type_spec = loop {
                     match self.walk_tree(nodes.next(), visitor) {
@@ -275,14 +272,7 @@ impl TreeWalker {
                         _ => unreachable!("Expected identifier as name for param"),
                     };
                 };
-                let is_array = loop {
-                    match self.walk_tree(nodes.next(), visitor) {
-                        ParserValue::Skip => continue,
-                        ParserValue::End => break false,
-                        ParserValue::None => break true,
-                        _ => unreachable!("Expected End (isArray=false) or None (isArray=true)"),
-                    }
-                };
+
                 let id = if is_array {
                     visitor.visit_array_param_decl(ident, type_spec, self.current_line)
                 } else {
@@ -291,18 +281,24 @@ impl TreeWalker {
                 let id = match id {
                     Ok(id) => id,
                     Err(e) => {
-                        visitor.add_error(e, self.current_line);
+                        visitor.add_error(&e);
                         return ParserValue::None;
                     }
                 };
                 ParserValue::Id(id)
             }
             Rule::void => ParserValue::ReturnType(ReturnType::Void),
+            Rule::fn_body => {
+                self.is_func_body = true;
+                // visitor.add_params_to_scope(self.current_line);
+                self.walk_tree(parse_node.into_inner().next(), visitor)
+            }
             Rule::compound_stmt => {
-                visitor.add_local_scope();
-                if !self.params_added {
-                    visitor.add_params_to_scope(self.current_line);
-                    self.params_added = true;
+                let compound_stmt_is_func_body = self.is_func_body;
+                if compound_stmt_is_func_body {
+                    self.is_func_body = false;
+                } else {
+                    visitor.add_local_scope();
                 }
                 let mut nodes = parse_node.into_inner();
                 let mut statements = vec![];
@@ -317,7 +313,9 @@ impl TreeWalker {
                     };
                 }
                 let root = visitor.visit_statement_list(statements);
-                visitor.leave_local_scope();
+                if !compound_stmt_is_func_body {
+                    visitor.leave_local_scope();
+                }
                 ParserValue::Node(root)
             }
             Rule::function_call => {
@@ -337,10 +335,7 @@ impl TreeWalker {
                         _ => unreachable!("Expected actual parameters"),
                     };
                 };
-                let func_call_node = match visitor.visit_func_call(&func_name, params) {
-                    Ok(n) => n,
-                    Err(e) => return e.into(),
-                };
+                let func_call_node = visitor.visit_func_call(&func_name, params);
                 ParserValue::Node(func_call_node)
             }
             Rule::actual_parameters => {
@@ -362,9 +357,7 @@ impl TreeWalker {
             }
             Rule::number => {
                 let parse_node = parse_node.as_str().to_string();
-                let res = visitor
-                    .visit_number(parse_node)
-                    .unwrap_or_else(SyntaxNode::from);
+                let res = visitor.visit_number(parse_node);
                 ParserValue::Node(res)
             }
             Rule::ident => {
@@ -435,10 +428,7 @@ impl TreeWalker {
                         _ => unreachable!("Expected statement node for if-statement body"),
                     }
                 };
-                let if_node = match visitor.visit_if(if_exp, if_body, else_body) {
-                    Ok(n) => n,
-                    Err(e) => return e.into(),
-                };
+                let if_node = visitor.visit_if(if_exp, if_body, else_body);
                 ParserValue::Node(if_node)
             }
             Rule::expression => {
@@ -475,12 +465,12 @@ impl TreeWalker {
                     );
                     let new_left = list.remove(highest_idx - 1).unwrap();
                     let new_right = list.remove(highest_idx - 1).unwrap();
-                    if let Err(e) = visitor.visit_binary(new_left, &mut highest_prec, new_right) {
-                        return e.into();
-                    }
+                    visitor.visit_binary(new_left, &mut highest_prec, new_right);
                     list.insert(highest_idx - 1, highest_prec);
                 }
-                ParserValue::Node(list.pop_front().unwrap())
+                let expr_node = list.pop_front().unwrap();
+                log::trace!("Final expression: {}", expr_node);
+                ParserValue::Node(expr_node)
             }
             Rule::assignment => {
                 let mut nodes = parse_node.into_inner();
@@ -498,10 +488,7 @@ impl TreeWalker {
                         _ => unreachable!("Expected assignment expression"),
                     }
                 };
-                let assignment = match visitor.visit_assignment(lvar, expr) {
-                    Ok(n) => n,
-                    Err(e) => return e.into(),
-                };
+                let assignment = visitor.visit_assignment(lvar, expr);
                 ParserValue::Node(assignment)
             }
             Rule::lvar | Rule::rvar => {
@@ -523,10 +510,7 @@ impl TreeWalker {
                 } else {
                     visitor.visit_variable(&name)
                 };
-                match id_node {
-                    Ok(n) => ParserValue::Node(n),
-                    Err(e) => e.into(),
-                }
+                ParserValue::Node(id_node)
             }
             Rule::iteration_stmt => {
                 let mut nodes = parse_node.into_inner();
@@ -548,10 +532,8 @@ impl TreeWalker {
                         }
                     }
                 };
-                match visitor.visit_while(condition, statement) {
-                    Ok(n) => ParserValue::Node(n),
-                    Err(e) => e.into(),
-                }
+                let while_node = visitor.visit_while(condition, statement);
+                ParserValue::Node(while_node)
             }
             Rule::unary => {
                 let mut nodes = parse_node.into_inner();
@@ -569,10 +551,8 @@ impl TreeWalker {
                         _ => unreachable!("Expected node"),
                     }
                 };
-                match visitor.visit_unary(unary_op, unary_child) {
-                    Ok(n) => ParserValue::Node(n),
-                    Err(e) => e.into(),
-                }
+                let node = visitor.visit_unary(unary_op, unary_child);
+                ParserValue::Node(node)
             }
             Rule::unary_op => {
                 let return_val = SyntaxNode::Unary {
@@ -597,6 +577,7 @@ impl TreeWalker {
                     }
                 });
                 self.current_line += newlines;
+                visitor.update_line_nr(self.current_line);
                 ParserValue::Skip
             }
             Rule::EOI => ParserValue::Skip,

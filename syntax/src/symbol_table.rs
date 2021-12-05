@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use crate::{
     id::*,
     symbol::{Symbol, SymbolType},
@@ -33,7 +35,7 @@ pub struct SymbolTable {
 
 impl fmt::Display for SymbolTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "############# Functions ############")?;
+        writeln!(f, "#################### Functions ###################")?;
         for (id, info) in self.functions.borrow().iter() {
             let SymbolInfo { symbol, .. } = self.symbols.get(id).unwrap();
             write!(f, "{} {} (", symbol.return_type, symbol.name)?;
@@ -54,14 +56,24 @@ impl fmt::Display for SymbolTable {
             writeln!(f)?;
         }
 
-        writeln!(f, "\n############# Symbols ##############")?;
-        writeln!(f, "Line {:>15} {:>15}", "Type", "Name")?;
-        for (_, info) in self.symbols.borrow().iter() {
+        writeln!(f, "\n#################### Symbols #####################")?;
+        writeln!(
+            f,
+            "{:<13} {:<13} {:<13} {:<13}",
+            "ID", "Line", "Type", "Name"
+        )?;
+        for (id, info) in self
+            .symbols
+            .borrow()
+            .iter()
+            .sorted_by(|(a, _), (b, _)| a.0.cmp(&b.0))
+        {
             let symbol = &info.symbol;
             if symbol.symbol_type != SymbolType::Function && symbol.line > 0 {
                 writeln!(
                     f,
-                    "{}. {:>16} {:>16}",
+                    "{:<13} {:<13} {:<13} {:<13}",
+                    format!("{}.", id.0),
                     format!("{}", symbol.line),
                     format!("{}", symbol.return_type),
                     format!("{}", symbol.name)

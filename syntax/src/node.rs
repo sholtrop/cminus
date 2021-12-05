@@ -214,7 +214,8 @@ impl SyntaxNode {
     pub fn coerce(from: SyntaxNode, to: ReturnType) -> SyntaxResult {
         let from_ret_t = from.return_type();
         assert_ne!(from_ret_t, to);
-        if to == ReturnType::Bool {
+
+        if to == ReturnType::Bool || to == ReturnType::Error {
             Ok(SyntaxNode::Unary {
                 child: Some(Box::new(from)),
                 node_type: NodeType::Coercion,

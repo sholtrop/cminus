@@ -18,7 +18,9 @@ declaration_list = _{ declaration+ }
 
 declaration = _{ fn_declaration | var_declaration }
 
-fn_declaration = { (type_specifier | void) ~ ident ~ "(" ~ formal_parameters ~ ")" ~ compound_stmt }
+fn_declaration = { (type_specifier | void) ~ ident ~ "(" ~ formal_parameters ~ ")" ~ fn_body }
+
+fn_body = { compound_stmt }
 
 var_declaration = { type_specifier ~ var_decl_list ~ ";" }
 

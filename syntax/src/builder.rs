@@ -40,11 +40,7 @@ impl SyntaxBuilder {
     /// Returns an error if a function with the given name is already defined.
     fn add_function(&mut self, symbol: Symbol) -> Result<SymbolId, SyntaxBuilderError> {
         if self.scope_manager.symbol_is_defined(&symbol.name) {
-            return Err(
-                format!("Function with name {} is already defined", symbol.name)
-                    .as_str()
-                    .into(),
-            );
+            return Err(format!("Function with name {} is already defined", symbol.name).into());
         }
         let id = self.table.add_function(symbol.clone());
         self.scope_manager.add_symbol(id, symbol.name)?;
@@ -115,7 +111,6 @@ impl SyntaxBuilder {
     }
 
     pub fn add_symbol(&mut self, symbol: Symbol) -> Result<SymbolId, SyntaxBuilderError> {
-        let is_param = symbol.is_param();
         if self.scope_manager.symbol_is_defined(&symbol.name) {
             return Err(format!("Symbol `{}` redefined in current scope", symbol.name).into());
         }
@@ -129,10 +124,8 @@ impl SyntaxBuilder {
         };
         let name = symbol.borrow().name.clone();
         let id = self.table.add_symbol(symbol, scope);
-        if is_param {
-            // We checked whether the symbol is defined already at the beginning of the function
-            self.scope_manager.add_symbol(id, name).unwrap();
-        }
+        // We checked whether the symbol is defined already at the beginning of the function
+        self.scope_manager.add_symbol(id, name).unwrap();
         Ok(id)
     }
 
@@ -144,21 +137,21 @@ impl SyntaxBuilder {
         self.scope_manager.leave_scope()
     }
 
-    /// Adds the parameters of the current function to the current scope.
-    /// Panics if there is no current function, i.e. we are in the global scope.
-    pub fn add_params_to_scope(&mut self) -> Result<(), SyntaxBuilderError> {
-        let id = self.current_function.unwrap();
-        for param in self.get_parameters(&id).unwrap() {
-            self.scope_manager
-                .add_symbol(id, param.name.clone())
-                .map_err(|_| {
-                    SyntaxBuilderError(format!(
-                        "Multiple parameters with name `{}` for function {}",
-                        param.name,
-                        self.get_symbol_by_id(&id).unwrap().name
-                    ))
-                })?;
-        }
-        Ok(())
-    }
+    // Adds the parameters of the current function to the current scope.
+    // Panics if there is no current function, i.e. we are in the global scope.
+    // pub fn add_params_to_scope(&mut self) -> Result<(), SyntaxBuilderError> {
+    //     let id = self.current_function.unwrap();
+    //     for param in self.get_parameters(&id).unwrap() {
+    //         self.scope_manager
+    //             .add_symbol(id, param.name.clone())
+    //             .map_err(|_| {
+    //                 SyntaxBuilderError(format!(
+    //                     "Multiple parameters with name `{}` for function {}",
+    //                     param.name,
+    //                     self.get_symbol_by_id(&id).unwrap().name
+    //                 ))
+    //             })?;
+    //     }
+    //     Ok(())
+    // }
 }

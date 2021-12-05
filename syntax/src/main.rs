@@ -30,7 +30,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let show_partial = matches.is_present("show_partial");
     logging::init_logger(level);
-    let input = std::fs::read_to_string("test.c")?;
+    let input = matches.value_of("INPUT").unwrap();
+    let input = std::fs::read_to_string(input)?;
     let parse_tree = lexical::parse(&input)?;
     let SyntaxAnalysisResult {
         errors,

@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
+#[derive(Clone)]
 pub struct SyntaxBuilderError(pub String);
 
 impl SyntaxBuilderError {
@@ -35,6 +36,7 @@ impl From<String> for SyntaxBuilderError {
 
 impl Error for SyntaxBuilderError {}
 
+#[derive(Clone)]
 pub struct SyntaxBuilderWarning(pub String);
 
 impl fmt::Display for SyntaxBuilderWarning {
