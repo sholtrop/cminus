@@ -12,14 +12,15 @@ mod visitor;
 use clap::clap_app;
 use general::logging;
 use log::LevelFilter;
-use syntax::{NodeType, SyntaxNode};
+use syntax::{NodeType, SyntaxAnalysisResult, SyntaxNode};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = clap_app!(myapp =>
         (version: "1.0")
         (about: "Produce an abstract syntax tree for the given input C-minus file")
-        (@arg INPUT: +required "Sets the input")
         (@arg verbose: -v --verbose "Print debug information")
+        (@arg show_partial: -s --show_partial "Shows the partial syntax tree built up until this point, even in case of an error")
+        (@arg INPUT: +required "Sets the input") 
     )
     .get_matches();
     let level = if matches.is_present("verbose") {
@@ -27,23 +28,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         LevelFilter::Info
     };
+    let show_partial = matches.is_present("show_partial");
     logging::init_logger(level);
     let input = std::fs::read_to_string("test.c")?;
     let parse_tree = lexical::parse(&input)?;
-    let res = syntax::generate(parse_tree)?;
-    log::info!("\n{}", res.symbol_table);
-    log::info!("\n{}", res.tree);
-    for (_, func) in res.tree.functions {
-        for node in func.tree.unwrap().preorder() {
-            if let SyntaxNode::Constant {
-                node_type, value, ..
-            } = node
-            {
-                if *node_type == NodeType::Error {
-                    log::error!("Error: {}", value.to_string())
-                }
-            }
+    let SyntaxAnalysisResult {
+        errors,
+        warnings,
+        symbol_table,
+        tree,
+    } = syntax::generate(parse_tree)?;
+    let has_errors = !errors.is_empty();
+    if !has_errors || show_partial {
+        log::info!("\n{}", symbol_table);
+        log::info!("\n{}", tree);
+    }
+    for (warning, line) in warnings {
+        log::warn!("Line {}: {}", line, warning);
+    }
+    if has_errors {
+        for (err, line) in errors {
+            log::error!("Line {}: {}", line, err);
         }
     }
+
     Ok(())
 }

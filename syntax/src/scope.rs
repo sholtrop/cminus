@@ -48,7 +48,7 @@ impl ScopeManager {
             .symbols
             .entry(name.clone())
         {
-            Entry::Occupied(_) => Err(format!("Symbol {} redefined in current scope", name)
+            Entry::Occupied(_) => Err(format!("Symbol `{}` redefined in current scope", name)
                 .as_str()
                 .into()),
             Entry::Vacant(e) => {

@@ -6,6 +6,7 @@ use std::cmp::Ordering;
 use std::ops::DerefMut;
 use std::{collections::HashMap, rc::Rc};
 
+use crate::error::SyntaxBuilderWarning;
 use crate::node::{ConstantNodeValue, NodeType};
 use crate::syntax_tree::SyntaxTree;
 use crate::{
@@ -20,10 +21,17 @@ use crate::{
 pub struct SyntaxAnalysisResult {
     pub tree: SyntaxTree,
     pub symbol_table: SymbolTable,
+    pub errors: Vec<ErrorWithLineno>,
+    pub warnings: Vec<WarningWithLineno>,
 }
+
+type ErrorWithLineno = (SyntaxBuilderError, usize);
+type WarningWithLineno = (SyntaxBuilderWarning, usize);
 
 pub struct Visitor {
     builder: SyntaxBuilder,
+    errors: Vec<ErrorWithLineno>,
+    warnings: Vec<WarningWithLineno>,
 }
 
 pub type SyntaxResult = Result<SyntaxNode, SyntaxBuilderError>;
@@ -32,11 +40,19 @@ impl Visitor {
     pub fn new() -> Self {
         Self {
             builder: SyntaxBuilder::new(),
+            errors: vec![],
+            warnings: vec![],
         }
     }
 
     pub fn result(self) -> SyntaxAnalysisResult {
-        self.builder.result()
+        let (symbol_table, tree) = self.builder.result();
+        SyntaxAnalysisResult {
+            symbol_table,
+            tree,
+            errors: self.errors,
+            warnings: self.warnings,
+        }
     }
 
     fn add_builtins(&mut self) {
@@ -485,27 +501,30 @@ impl Visitor {
     pub fn visit_array_param_decl(
         &mut self,
         name: SymbolName,
-        arr_size: SyntaxNode,
         base_type: ReturnType,
         line: usize,
     ) -> Result<SymbolId, SyntaxBuilderError> {
-        let size = match arr_size {
-            SyntaxNode::Constant { value, .. } => {
-                let value = i64::from(value);
-                if value < 1 {
-                    return Err("Array size must be greater than 0".into());
-                }
-                value as usize
-            }
-            _ => return Err("`size` was not a constant number SyntaxNode".into()),
-        };
         let arr_symbol = Symbol {
             line,
             name,
             return_type: base_type.to_array_type(),
-            symbol_type: SymbolType::ArrayParam { size },
+            symbol_type: SymbolType::ArrayParam,
         };
         let id = self.builder.add_symbol(arr_symbol)?;
         Ok(id)
+    }
+
+    pub fn add_params_to_scope(&mut self, line: usize) {
+        if let Err(e) = self.builder.add_params_to_scope() {
+            self.errors.push((e, line));
+        }
+    }
+
+    pub fn add_error(&mut self, err: SyntaxBuilderError, line: usize) {
+        self.errors.push((err, line))
+    }
+
+    pub fn add_warning(&mut self, warning: SyntaxBuilderWarning, line: usize) {
+        self.warnings.push((warning, line))
     }
 }

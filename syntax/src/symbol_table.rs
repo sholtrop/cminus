@@ -58,7 +58,7 @@ impl fmt::Display for SymbolTable {
         writeln!(f, "Line {:>15} {:>15}", "Type", "Name")?;
         for (_, info) in self.symbols.borrow().iter() {
             let symbol = &info.symbol;
-            if symbol.symbol_type != SymbolType::Function {
+            if symbol.symbol_type != SymbolType::Function && symbol.line > 0 {
                 writeln!(
                     f,
                     "{}. {:>16} {:>16}",
@@ -108,7 +108,7 @@ impl SymbolTable {
                 .get_mut(&owning_function_id)
                 .expect("Invariant violated: Function id not found");
             match sym_type {
-                SymbolType::Parameter => {
+                SymbolType::Parameter | SymbolType::ArrayParam => {
                     func_info.parameters.push(id);
                 }
                 SymbolType::Variable => {

@@ -112,7 +112,7 @@ pub enum SymbolType {
     TempVar,
     Label,
     ArrayVariable { size: usize },
-    ArrayParam { size: usize },
+    ArrayParam,
 }
 
 impl fmt::Display for SymbolType {
@@ -130,7 +130,7 @@ impl fmt::Display for SymbolType {
                 SymbolType::TempVar => "tempvar".into(),
                 SymbolType::Label => "label".into(),
                 SymbolType::ArrayVariable { size } => format!("arrayvar({})", size),
-                SymbolType::ArrayParam { size } => format!("arrayparam({})", size),
+                SymbolType::ArrayParam => "arrayparam".into(),
             }
         )
     }
@@ -145,13 +145,19 @@ pub struct Symbol {
 
 impl Symbol {
     pub fn is_array(&self) -> bool {
-        match self.return_type {
+        matches!(
+            self.return_type,
             ReturnType::Int8Array
-            | ReturnType::IntArray
-            | ReturnType::Uint8Array
-            | ReturnType::UintArray => true,
-            _ => false,
-        }
+                | ReturnType::IntArray
+                | ReturnType::Uint8Array
+                | ReturnType::UintArray
+        )
+    }
+    pub fn is_param(&self) -> bool {
+        matches!(
+            self.symbol_type,
+            SymbolType::ArrayParam | SymbolType::Parameter
+        )
     }
 }
 

@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use crate::{
-    error::SyntaxBuilderError,
+    error::{SyntaxBuilderError, SyntaxBuilderWarning},
     id::{SymbolId, SymbolName},
     node::{ConstantNodeValue, NodeType, SyntaxNode},
     symbol::{ReturnType, Symbol, SymbolType},
@@ -34,6 +34,7 @@ impl From<SyntaxBuilderError> for ParserValue {
 pub struct TreeWalker {
     current_line: usize,
     current_decl_type: Option<ReturnType>,
+    params_added: bool,
 }
 
 impl TreeWalker {
@@ -41,6 +42,7 @@ impl TreeWalker {
         Self {
             current_line: 1,
             current_decl_type: None,
+            params_added: false,
         }
     }
 
@@ -98,7 +100,7 @@ impl TreeWalker {
                         return e.into();
                     }
                 };
-                // Param declaration is handled in Rule::Param
+                // Param declaration is handled in [Rule::parameter]
                 // We do need to check if that worked correctly, but don't need the return value
                 loop {
                     match self.walk_tree(nodes.next(), visitor) {
@@ -111,11 +113,12 @@ impl TreeWalker {
                         _ => panic!("Expected function parameters"),
                     };
                 }
+                self.params_added = false;
                 let func_body = loop {
                     match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Node(body) => break body,
                         ParserValue::Skip => continue,
-                        _ => unreachable!("Expected function body"), // return Err("Expected function body".into()),
+                        _ => unreachable!("Expected function body"),
                     };
                 };
                 if let Err(e) = visitor.visit_func_end(&id, func_body) {
@@ -201,8 +204,7 @@ impl TreeWalker {
                     ParserValue::None
                 }
             }
-            Rule::array_decl | Rule::array_parameter => {
-                let is_param = parse_node.as_rule() == Rule::array_parameter;
+            Rule::array_decl => {
                 let mut nodes = parse_node.into_inner();
                 let mut ident: Option<SymbolName> = None;
                 let mut size: Option<SyntaxNode> = None;
@@ -218,27 +220,15 @@ impl TreeWalker {
                 }
                 if let Some(ident) = ident {
                     if let Some(size) = size {
-                        if is_param {
-                            return match visitor.visit_array_param_decl(
-                                ident,
-                                size,
-                                self.current_decl_type.expect("No declaration type set"),
-                                self.current_line,
-                            ) {
-                                Ok(id) => ParserValue::Id(id),
-                                Err(e) => ParserValue::Node(e.into()),
-                            };
-                        } else {
-                            return match visitor.visit_array_decl(
-                                ident,
-                                size,
-                                self.current_decl_type.expect("No declaration type set"),
-                                self.current_line,
-                            ) {
-                                Ok(id) => ParserValue::Id(id),
-                                Err(e) => ParserValue::Node(e.into()),
-                            };
-                        }
+                        return match visitor.visit_array_decl(
+                            ident,
+                            size,
+                            self.current_decl_type.expect("No declaration type set"),
+                            self.current_line,
+                        ) {
+                            Ok(id) => ParserValue::Id(id),
+                            Err(e) => ParserValue::Node(e.into()),
+                        };
                     }
                 }
                 ParserValue::Node(SyntaxNode::create_error("Missing array ident or size"))
@@ -247,18 +237,17 @@ impl TreeWalker {
                 let mut nodes = parse_node.into_inner();
                 let mut params = vec![];
                 loop {
-                    // TODO: formal_parameters changed into normal/array param, change this loop as well
                     match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::ReturnType(void) => {
                             if void == ReturnType::Void {
                                 break;
                             } else {
-                                panic!("Expected identifier as name for param",);
+                                panic!("Expected returntype for param",);
                             }
                         }
                         ParserValue::Id(param_id) => params.push(param_id),
                         ParserValue::Skip => continue,
-                        ParserValue::End => break,
+                        ParserValue::End | ParserValue::None => break,
                         _ => {
                             panic!("Expected identifier as name for param");
                         }
@@ -270,31 +259,51 @@ impl TreeWalker {
                     ParserValue::Ids(params)
                 }
             }
-            Rule::parameter => {
+            Rule::parameter | Rule::array_parameter => {
                 let mut nodes = parse_node.into_inner();
                 let type_spec = loop {
                     match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::ReturnType(rt) => break rt,
                         ParserValue::Skip => continue,
-                        _ => panic!("Expected type specifier for param"),
+                        _ => unreachable!("Expected type specifier for param"),
                     };
                 };
                 let ident = loop {
                     match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Name(name) => break name,
                         ParserValue::Skip => continue,
-                        _ => panic!("Expected identifier as name for param"),
+                        _ => unreachable!("Expected identifier as name for param"),
                     };
                 };
-                let id = match visitor.visit_param_decl(ident, type_spec, self.current_line) {
+                let is_array = loop {
+                    match self.walk_tree(nodes.next(), visitor) {
+                        ParserValue::Skip => continue,
+                        ParserValue::End => break false,
+                        ParserValue::None => break true,
+                        _ => unreachable!("Expected End (isArray=false) or None (isArray=true)"),
+                    }
+                };
+                let id = if is_array {
+                    visitor.visit_array_param_decl(ident, type_spec, self.current_line)
+                } else {
+                    visitor.visit_param_decl(ident, type_spec, self.current_line)
+                };
+                let id = match id {
                     Ok(id) => id,
-                    Err(e) => return e.into(),
+                    Err(e) => {
+                        visitor.add_error(e, self.current_line);
+                        return ParserValue::None;
+                    }
                 };
                 ParserValue::Id(id)
             }
             Rule::void => ParserValue::ReturnType(ReturnType::Void),
             Rule::compound_stmt => {
                 visitor.add_local_scope();
+                if !self.params_added {
+                    visitor.add_params_to_scope(self.current_line);
+                    self.params_added = true;
+                }
                 let mut nodes = parse_node.into_inner();
                 let mut statements = vec![];
                 loop {
