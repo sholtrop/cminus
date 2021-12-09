@@ -57,6 +57,7 @@ impl fmt::Display for SymbolTable {
         }
 
         writeln!(f, "\n#################### Symbols #####################")?;
+        writeln!(f, "(Excluding functions and builtins)")?;
         writeln!(
             f,
             "{:<13} {:<13} {:<13} {:<13}",
@@ -170,5 +171,40 @@ impl SymbolTable {
             symbols.push(self.symbols.get(id)?.symbol.clone());
         }
         Some(symbols)
+    }
+
+    /// For tests
+    pub fn has_function(&self, func_name: &str) -> bool {
+        self.symbols
+            .values()
+            .any(|s| s.symbol.name == SymbolName::from(func_name))
+    }
+
+    /// For tests
+    pub fn has_parameter(&self, func_name: &str, param_name: &str) -> bool {
+        let func = match self.symbols.values().find(|s| s.symbol.name.0 == func_name) {
+            Some(f) => f,
+            None => return false,
+        };
+        self.functions
+            .get(&func.id)
+            .expect("No parameters for found function id")
+            .parameters
+            .iter()
+            .any(|pid| self.get_symbol(pid).unwrap().name.0 == param_name)
+    }
+
+    /// For tests
+    pub fn has_local(&self, func_name: &str, local: &str) -> bool {
+        let func = match self.symbols.values().find(|s| s.symbol.name.0 == func_name) {
+            Some(f) => f,
+            None => return false,
+        };
+        self.functions
+            .get(&func.id)
+            .expect("No parameters for found function id")
+            .variables
+            .iter()
+            .any(|vid| self.get_symbol(vid).unwrap().name.0 == local)
     }
 }

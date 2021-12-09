@@ -111,9 +111,9 @@ impl SyntaxBuilder {
     }
 
     pub fn add_symbol(&mut self, symbol: Symbol) -> Result<SymbolId, SyntaxBuilderError> {
-        if self.scope_manager.symbol_is_defined(&symbol.name) {
-            return Err(format!("Symbol `{}` redefined in current scope", symbol.name).into());
-        }
+        // if self.scope_manager.symbol_is_defined(&symbol.name) {
+        //     return Err(format!("Symbol `{}` redefined in current scope", symbol.name).into());
+        // }
 
         let scope = if let Some(id) = self.current_function {
             SymbolScope::Local {
@@ -125,7 +125,7 @@ impl SyntaxBuilder {
         let name = symbol.borrow().name.clone();
         let id = self.table.add_symbol(symbol, scope);
         // We checked whether the symbol is defined already at the beginning of the function
-        self.scope_manager.add_symbol(id, name).unwrap();
+        self.scope_manager.add_symbol(id, name)?;
         Ok(id)
     }
 

@@ -1,21 +1,174 @@
+use lexical::ParseTree;
 use std::io;
-use syntax::{NodeType, SyntaxAnalysisResult, SyntaxNode};
+use syntax::{NodeType, SyntaxAnalysisResult};
 use tests::{collect_tests_in_path, run_single_test, TestStats};
 
 const PROGRAM_TEST_PATH: &str = "tests/testfiles/general/programs";
 const UNIT_TEST_PATH: &str = "tests/testfiles/general/units";
 const SYNTAX_TEST_PATH: &str = "tests/testfiles/syntax";
 
+mod specific_tests {
+    use super::*;
+    use itertools::{self, EitherOrBoth, Itertools};
+    use lexical::ParseTree;
+    use std::array::IntoIter;
+    use syntax::SyntaxNode;
+
+    const GLOBAL_PREFIX: &str = "tests/testfiles/general/units/";
+    fn read_to_string(path: &str) -> String {
+        std::fs::read_to_string(path).expect("Could not read file")
+    }
+
+    fn syntax_similar<'a>(
+        expectation: impl IntoIterator<Item = &'a str>,
+        actual: impl IntoIterator<Item = &'a SyntaxNode>,
+    ) -> bool {
+        for (idx, pair) in expectation
+            .into_iter()
+            .zip_longest(actual.into_iter())
+            .enumerate()
+        {
+            match pair {
+                EitherOrBoth::Both(l, r) => {
+                    if l != r.to_string() {
+                        log::error!(
+                            "Nodes not similar at position {}. Expected: `{}` | Actual: `{}`",
+                            idx + 1,
+                            l,
+                            r
+                        );
+                        return false;
+                    }
+                }
+                EitherOrBoth::Right(r) => {
+                    log::error!("Syntax was not similar: Actual had more nodes than expected tree. Last node: {}", r);
+                    return false;
+                }
+                EitherOrBoth::Left(l) => {
+                    log::error!("Syntax was not similar: Expectation had more nodes than actual tree. Last node: {}", l);
+                    return false;
+                }
+            }
+        }
+        true
+    }
+    pub mod declaration {
+        use super::*;
+        const PREFIX: &str = "declarations/";
+        pub fn simple_func() -> bool {
+            let test_path = GLOBAL_PREFIX.to_owned() + PREFIX + "correct/simple_func.c";
+            log::info!("Running test {}", test_path);
+            let input = read_to_string(&test_path);
+            let contents = lexical::parse(input.as_str())
+                .expect("Could not lexically parse file for syntax test");
+            let result = syntax::generate(contents);
+            assert!(result.is_ok());
+            let result = result.unwrap();
+            let table = result.symbol_table;
+            assert!(table.has_function("main"));
+            true
+        }
+        pub fn simple_func_param() -> bool {
+            let test_path =
+                GLOBAL_PREFIX.to_owned() + PREFIX + "correct/simple_func_param/simple_func_param.c";
+            log::info!("Running test {}", test_path);
+            let input = read_to_string(&test_path);
+            let contents = lexical::parse(input.as_str())
+                .expect("Could not lexically parse file for syntax test");
+            let result = syntax::generate(contents);
+            assert!(result.is_ok());
+            let result = result.unwrap();
+            let table = result.symbol_table;
+            assert!(table.has_function("main"));
+            assert!(table.has_function("oof"));
+            assert!(table.has_parameter("oof", "x"));
+            assert!(table.has_parameter("oof", "y"));
+            true
+        }
+        pub fn simple_var_assign() -> bool {
+            let test_path =
+                GLOBAL_PREFIX.to_owned() + PREFIX + "correct/simple_var_assign/simple_var_assign.c";
+            log::info!("Running test {}", test_path);
+            let input = read_to_string(&test_path);
+            let contents = lexical::parse(input.as_str())
+                .expect("Could not lexically parse file for syntax test");
+            let result = syntax::generate(contents);
+            assert!(result.is_ok());
+            let result = result.unwrap();
+            let table = result.symbol_table;
+            assert!(table.has_local("main", "x"));
+            true
+        }
+    }
+
+    pub mod node_coercion {
+        use super::*;
+        const PREFIX: &str = "tests/testfiles/syntax/node/correct/coercion/";
+
+        #[rustfmt::skip]
+        pub fn if_coerce() -> bool {
+            let test_path = PREFIX.to_owned() + "if_coercion.c";
+            log::info!("Running test {}", test_path);
+            let input = read_to_string(&test_path);
+            let contents = lexical::parse(input.as_str())
+                .expect("Could not lexically parse file for syntax test");
+            let result = syntax::generate(contents);
+            assert!(result.is_ok());
+            let result = result.unwrap();
+            let main = result.tree.get_func_by_name("main").unwrap();
+            assert!(main.tree.is_some());
+            let tree = main.tree.as_ref().unwrap().preorder();
+            let expectation = [
+                "statement_list - void",
+                    "assignment - int",
+                        "symbol - int",
+                        "coercion - int",
+                        "num - 1",
+
+                "statement_list - void",
+                    "if - void",
+                        "coercion - bool",
+                        "symbol - int",
+                    "statement_list - void",
+                    "assignment - int",
+                        "symbol - int",
+                        "coercion - int",
+                        "num - 12",
+                    "statement_list - void",
+                    "function_call - void",
+                        "symbol - void",
+                        "expression_list - void",
+                            "symbol - int",
+                "statement_list - void",
+                    "return - int",
+                        "coercion - int",
+                        "num - 0"
+            ];
+            assert!(syntax_similar(expectation, tree));
+            true
+        }
+    }
+
+    pub const ALL_TESTS: [fn() -> bool; 4] = [
+        declaration::simple_func,
+        declaration::simple_func_param,
+        declaration::simple_var_assign,
+        node_coercion::if_coerce,
+    ];
+}
+
 pub fn test_function(input: &str) -> Result<(), &str> {
-    let parsed = lexical::parse(input).unwrap_or_else(|_| {
-        panic!("Could not lexically parse file for syntax test");
-    });
+    let parsed = lexical::parse(input).expect("Could not lexically parse file for syntax test");
+
     let result = syntax::generate(parsed);
     if let Err(err) = result {
         log::error!("{}", err);
         return Err("Error occurred");
     }
-    let SyntaxAnalysisResult { tree, .. } = result.unwrap();
+    let SyntaxAnalysisResult { tree, errors, .. } = result.unwrap();
+    if !errors.is_empty() {
+        return Err("Errors present");
+    }
     for (id, func) in tree.functions {
         for node in func
             .tree
@@ -26,13 +179,11 @@ pub fn test_function(input: &str) -> Result<(), &str> {
             .preorder()
         {
             if node.node_type() == NodeType::Error {
-                if let SyntaxNode::Constant { value, .. } = node {
-                    log::error!("Found error node: {}", value);
-                }
                 return Err("Error node found");
             }
         }
     }
+
     Ok(())
 }
 
@@ -51,7 +202,26 @@ pub fn run() -> io::Result<()> {
             stats.success += 1;
         }
     }
+    log::info!("[{} / {}] GENERAL TESTS PASSED", stats.success, stats.total);
+    stats.success = 0;
+    stats.total = 0;
+    println!();
+    log::info!("Running specific tests...");
 
-    log::info!("[{} / {}] TESTS PASSED", stats.success, stats.total);
+    for test in specific_tests::ALL_TESTS {
+        stats.total += 1;
+        if test() {
+            stats.success += 1;
+            log::info!("↪    PASSED");
+        } else {
+            log::error!("↪    FAILED");
+        }
+    }
+
+    log::info!(
+        "[{} / {}] SPECIFIC TESTS PASSED",
+        stats.success,
+        stats.total
+    );
     Ok(())
 }

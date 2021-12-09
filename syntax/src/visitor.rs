@@ -58,51 +58,65 @@ impl Visitor {
     }
 
     fn add_builtins(&mut self) {
+        let old_line = self.current_line;
+        self.current_line = 0;
+
         // writeinteger
         let id = self
-            .visit_func_start(Symbol {
-                name: SymbolName::from("writeinteger"),
-                return_type: ReturnType::Void,
-                symbol_type: SymbolType::Function,
-                line: 0,
-            })
+            .visit_func_start(
+                SymbolType::Function,
+                ReturnType::Void,
+                SymbolName::from("writeinteger"),
+            )
             .expect("Error adding builtins: Function `writeinteger` start");
-        self.add_local_scope();
-        self.visit_param_decl(SymbolName::from("i"), ReturnType::Int, 0)
+
+        self.visit_param_decl(SymbolName::from("i"), ReturnType::Int)
             .expect("Error adding builtins: Param `i` for `writeinteger`");
-        self.leave_local_scope();
+
         self.visit_func_end(&id, SyntaxNode::Empty)
             .expect("Error adding builtins: Function `writeinteger` end");
         // writeunsigned
         let id = self
-            .visit_func_start(Symbol {
-                name: SymbolName::from("writeunsigned"),
-                return_type: ReturnType::Void,
-                symbol_type: SymbolType::Function,
-                line: 0,
-            })
+            .visit_func_start(
+                SymbolType::Function,
+                ReturnType::Void,
+                SymbolName::from("writeunsigned"),
+            )
             .expect("Error adding builtins: Function `writeunsigned` start");
-        self.add_local_scope();
-        self.visit_param_decl(SymbolName::from("i"), ReturnType::Uint, 0)
+
+        self.visit_param_decl(SymbolName::from("i"), ReturnType::Uint)
             .expect("Error adding builtins: Param `i` for `writeunsigned`");
-        self.leave_local_scope();
+
         self.visit_func_end(&id, SyntaxNode::Empty)
             .expect("Error adding builtins: Function `writeunsigned` end");
         // readinteger
         let id = self
-            .visit_func_start(Symbol {
-                name: SymbolName::from("readinteger"),
-                return_type: ReturnType::Int,
-                symbol_type: SymbolType::Function,
-                line: 0,
-            })
+            .visit_func_start(
+                SymbolType::Function,
+                ReturnType::Int,
+                SymbolName::from("readinteger"),
+            )
             .expect("Error adding builtins: Function `readinteger` start");
         self.visit_func_end(&id, SyntaxNode::Empty)
             .expect("Error adding builtins: Function `readinteger` end");
+        let id = self
+            .visit_func_start(
+                SymbolType::Function,
+                ReturnType::Int,
+                SymbolName::from("readunsigned"),
+            )
+            .expect("Error adding builtins: Function `readunsigned` start");
+        self.visit_func_end(&id, SyntaxNode::Empty)
+            .expect("Error adding builtins: Function `readunsigned` end");
+        self.current_line = old_line;
     }
 
-    pub fn update_line_nr(&mut self, line: usize) {
-        self.current_line = line;
+    pub fn current_line(&self) -> usize {
+        self.current_line
+    }
+
+    pub fn increase_line_nr(&mut self, increase: usize) {
+        self.current_line += increase;
     }
 
     pub fn program_start(&mut self) {
@@ -113,24 +127,42 @@ impl Visitor {
     /// or an error if it is already defined.
     pub fn visit_func_start(
         &mut self,
-        func_symbol: Symbol,
+        symbol_type: SymbolType,
+        return_type: ReturnType,
+        name: SymbolName,
     ) -> Result<SymbolId, SyntaxBuilderError> {
+        let id = self
+            .builder
+            .enter_function(Symbol {
+                name,
+                return_type,
+                symbol_type,
+                line: self.current_line,
+            })
+            .map_err(|e| {
+                self.add_error(&e);
+                e
+            })?;
         self.add_local_scope();
-        self.builder.enter_function(func_symbol)
+        Ok(id)
     }
 
     pub fn visit_param_decl(
         &mut self,
         name: SymbolName,
         return_type: ReturnType,
-        line: usize,
     ) -> Result<SymbolId, SyntaxBuilderError> {
-        self.builder.add_symbol(Symbol {
-            name,
-            return_type,
-            symbol_type: SymbolType::Parameter,
-            line,
-        })
+        self.builder
+            .add_symbol(Symbol {
+                name,
+                return_type,
+                symbol_type: SymbolType::Parameter,
+                line: self.current_line,
+            })
+            .map_err(|err| {
+                self.add_error(&err);
+                err
+            })
     }
 
     /// Declare a new variable and return its [SymbolId].
@@ -140,14 +172,18 @@ impl Visitor {
         &mut self,
         name: SymbolName,
         return_type: ReturnType,
-        line: usize,
     ) -> Result<SymbolId, SyntaxBuilderError> {
-        self.builder.add_symbol(Symbol {
-            name,
-            return_type,
-            symbol_type: SymbolType::Variable,
-            line,
-        })
+        self.builder
+            .add_symbol(Symbol {
+                name,
+                return_type,
+                symbol_type: SymbolType::Variable,
+                line: self.current_line,
+            })
+            .map_err(|err| {
+                self.add_error(&err);
+                err
+            })
     }
 
     pub fn visit_func_end(
@@ -177,12 +213,13 @@ impl Visitor {
         let (func, id) = match self.builder.get_symbol_by_name(name) {
             Some((f, s)) => (f, s),
             None => {
-                let err =
-                    SyntaxBuilderError::from(format!("Cannot find function with name `{}`", name));
+                let err = SyntaxBuilderError(format!("Cannot find function with name `{}`", name));
                 self.add_error(&err);
                 return err.into();
             }
         };
+        // Leave me alone, mr. borrow checker
+        let func = func.clone();
         let mut current_node: Option<SyntaxNode> = None;
 
         if let SymbolType::Function = func.symbol_type {
@@ -219,11 +256,11 @@ impl Visitor {
 
             for pair in actual_args.zip_longest(formal_args).rev() {
                 if let EitherOrBoth::Both(mut actual_arg, formal_arg) = pair {
-                    if actual_arg.return_type() != formal_arg.return_type {
-                        actual_arg = SyntaxNode::coerce(actual_arg, formal_arg.return_type)
-                            .unwrap_or_else(SyntaxNode::from);
-                    }
-
+                    actual_arg = SyntaxNode::coerce(actual_arg, formal_arg.return_type)
+                        .unwrap_or_else(|err| {
+                            self.add_error(&err);
+                            err.into()
+                        });
                     current_node = Some(SyntaxNode::Binary {
                         node_type: NodeType::ExpressionList,
                         return_type: ReturnType::Void,
@@ -300,15 +337,24 @@ impl Visitor {
 
     pub fn visit_return(&mut self, ret_node: Option<SyntaxNode>) -> SyntaxNode {
         if let Some(mut ret_node) = ret_node {
-            let current_ret = self
+            let current_func = self
                 .builder
                 .get_current_function()
-                .expect("Error: No current function set")
-                .return_type;
-            if ret_node.return_type() != current_ret {
-                ret_node =
-                    SyntaxNode::coerce(ret_node, current_ret).unwrap_or_else(SyntaxNode::from)
+                .expect("Error: No current function set");
+            let current_ret = current_func.return_type;
+            if current_ret == ReturnType::Void {
+                let err = SyntaxBuilderError(format!(
+                    "Void function `{}` can not return a value",
+                    current_func.name
+                ));
+                self.add_error(&err);
+                return err.into();
             }
+            ret_node = SyntaxNode::coerce(ret_node, current_ret).unwrap_or_else(|err| {
+                self.add_error(&err);
+                err.into()
+            });
+
             SyntaxNode::Unary {
                 node_type: NodeType::Return,
                 return_type: ret_node.return_type(),
@@ -324,15 +370,13 @@ impl Visitor {
     }
 
     pub fn visit_while(&mut self, mut expression: SyntaxNode, statement: SyntaxNode) -> SyntaxNode {
-        if expression.return_type() != ReturnType::Bool {
-            expression = match SyntaxNode::coerce(expression, ReturnType::Bool) {
-                Ok(n) => n,
-                Err(err) => {
-                    self.add_error(&err);
-                    return err.into();
-                }
+        expression = match SyntaxNode::coerce(expression, ReturnType::Bool) {
+            Ok(n) => n,
+            Err(err) => {
+                self.add_error(&err);
+                return err.into();
             }
-        }
+        };
         SyntaxNode::Binary {
             node_type: NodeType::While,
             return_type: ReturnType::Void,
@@ -348,15 +392,15 @@ impl Visitor {
         else_body: Option<SyntaxNode>,
     ) -> SyntaxNode {
         let cond_ret = condition.return_type();
-        if cond_ret != ReturnType::Bool {
-            condition = match SyntaxNode::coerce(condition, ReturnType::Bool) {
-                Ok(n) => n,
-                Err(err) => {
-                    self.add_error(&err);
-                    return err.into();
-                }
+
+        condition = match SyntaxNode::coerce(condition, ReturnType::Bool) {
+            Ok(n) => n,
+            Err(err) => {
+                self.add_error(&err);
+                return err.into();
             }
-        }
+        };
+
         let rchild = if let Some(else_body) = else_body {
             SyntaxNode::Binary {
                 node_type: NodeType::IfTargets,
@@ -377,16 +421,14 @@ impl Visitor {
 
     pub fn visit_assignment(&mut self, lvar: SyntaxNode, mut exp: SyntaxNode) -> SyntaxNode {
         let ret_type = lvar.return_type();
-
-        if exp.return_type() != ret_type {
-            exp = match SyntaxNode::coerce(exp, ret_type) {
-                Ok(n) => n,
-                Err(err) => {
-                    self.add_error(&err);
-                    return err.into();
-                }
+        exp = match SyntaxNode::coerce(exp, ret_type) {
+            Ok(n) => n,
+            Err(err) => {
+                self.add_error(&err);
+                return err.into();
             }
-        }
+        };
+
         SyntaxNode::Binary {
             node_type: NodeType::Assignment,
             return_type: ret_type,
@@ -514,7 +556,6 @@ impl Visitor {
         name: SymbolName,
         arr_size: SyntaxNode,
         base_type: ReturnType,
-        line: usize,
     ) -> Result<SymbolId, SyntaxBuilderError> {
         let size = match arr_size {
             SyntaxNode::Constant { value, .. } => {
@@ -527,12 +568,15 @@ impl Visitor {
             _ => return Err("`size` was not a Constant number SyntaxNode".into()),
         };
         let arr_symbol = Symbol {
-            line,
+            line: self.current_line,
             name,
             return_type: base_type.to_array_type(),
             symbol_type: SymbolType::ArrayVariable { size },
         };
-        let id = self.builder.add_symbol(arr_symbol)?;
+        let id = self.builder.add_symbol(arr_symbol).map_err(|err| {
+            self.add_error(&err);
+            err
+        })?;
         Ok(id)
     }
 
@@ -540,15 +584,17 @@ impl Visitor {
         &mut self,
         name: SymbolName,
         base_type: ReturnType,
-        line: usize,
     ) -> Result<SymbolId, SyntaxBuilderError> {
         let arr_symbol = Symbol {
-            line,
+            line: self.current_line,
             name,
             return_type: base_type.to_array_type(),
             symbol_type: SymbolType::ArrayParam,
         };
-        let id = self.builder.add_symbol(arr_symbol)?;
+        let id = self.builder.add_symbol(arr_symbol).map_err(|err| {
+            self.add_error(&err);
+            err
+        })?;
         Ok(id)
     }
 

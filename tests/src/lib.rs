@@ -69,6 +69,7 @@ pub fn collect_tests_in_path(path: impl Into<PathBuf>) -> io::Result<Vec<Test>> 
 }
 
 pub fn run_single_test(test: Test, test_func: TestFunction) -> Result<(), TestFailed> {
+    println!();
     log::info!("Running test {}", test.name);
     let input = std::fs::read_to_string(test.path).or(Err(TestFailed {}))?;
     let result = test_func(&input);

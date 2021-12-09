@@ -32,17 +32,19 @@ impl From<SyntaxBuilderError> for ParserValue {
 }
 
 pub struct TreeWalker {
-    current_line: usize,
+    // current_line: usize,
     current_decl_type: Option<ReturnType>,
     is_func_body: bool,
+    func_has_return: bool,
 }
 
 impl TreeWalker {
     pub fn new() -> Self {
         Self {
-            current_line: 1,
+            // current_line: 1,
             current_decl_type: None,
             is_func_body: false,
+            func_has_return: false,
         }
     }
 
@@ -75,6 +77,7 @@ impl TreeWalker {
             }
             Rule::fn_declaration => {
                 let mut nodes = parse_node.into_inner();
+                self.func_has_return = false;
                 let return_type = loop {
                     match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::ReturnType(rt) => break rt,
@@ -89,12 +92,7 @@ impl TreeWalker {
                         _ => panic!("Expected function name"),
                     };
                 };
-                let id = match visitor.visit_func_start(Symbol {
-                    name,
-                    return_type,
-                    symbol_type: SymbolType::Function,
-                    line: self.current_line,
-                }) {
+                let id = match visitor.visit_func_start(SymbolType::Function, return_type, name) {
                     Ok(id) => id,
                     Err(e) => {
                         return e.into();
@@ -120,6 +118,10 @@ impl TreeWalker {
                         _ => unreachable!("Expected function body"),
                     };
                 };
+                if return_type != ReturnType::Void && !self.func_has_return {
+                    visitor.add_error(&SyntaxBuilderError::from("Function has no return"));
+                    return ParserValue::Skip;
+                }
                 if let Err(e) = visitor.visit_func_end(&id, func_body) {
                     e.into()
                 } else {
@@ -171,11 +173,10 @@ impl TreeWalker {
                 loop {
                     match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Name(name) => {
-                            let id =
-                                match visitor.visit_var_decl(name, decl_type, self.current_line) {
-                                    Ok(id) => id,
-                                    Err(e) => return e.into(),
-                                };
+                            let id = match visitor.visit_var_decl(name, decl_type) {
+                                Ok(id) => id,
+                                Err(e) => return e.into(),
+                            };
                             current_id = Some(SyntaxNode::Symbol {
                                 node_type: NodeType::Id,
                                 return_type: decl_type,
@@ -220,7 +221,6 @@ impl TreeWalker {
                             ident,
                             size,
                             self.current_decl_type.expect("No declaration type set"),
-                            self.current_line,
                         ) {
                             Ok(id) => ParserValue::Id(id),
                             Err(e) => ParserValue::Node(e.into()),
@@ -274,9 +274,9 @@ impl TreeWalker {
                 };
 
                 let id = if is_array {
-                    visitor.visit_array_param_decl(ident, type_spec, self.current_line)
+                    visitor.visit_array_param_decl(ident, type_spec)
                 } else {
-                    visitor.visit_param_decl(ident, type_spec, self.current_line)
+                    visitor.visit_param_decl(ident, type_spec)
                 };
                 let id = match id {
                     Ok(id) => id,
@@ -402,6 +402,7 @@ impl TreeWalker {
                     };
                 };
                 let return_node = visitor.visit_return(return_exp);
+                self.func_has_return = true;
                 ParserValue::Node(return_node)
             }
             Rule::selection_stmt => {
@@ -469,7 +470,6 @@ impl TreeWalker {
                     list.insert(highest_idx - 1, highest_prec);
                 }
                 let expr_node = list.pop_front().unwrap();
-                log::trace!("Final expression: {}", expr_node);
                 ParserValue::Node(expr_node)
             }
             Rule::assignment => {
@@ -576,8 +576,7 @@ impl TreeWalker {
                         n
                     }
                 });
-                self.current_line += newlines;
-                visitor.update_line_nr(self.current_line);
+                visitor.increase_line_nr(newlines);
                 ParserValue::Skip
             }
             Rule::EOI => ParserValue::Skip,
@@ -585,7 +584,7 @@ impl TreeWalker {
                 unreachable!(
                     "Unimplemented rule `{:?}`:\n{}. {}",
                     parse_node.as_rule(),
-                    self.current_line,
+                    visitor.current_line(),
                     parse_node.as_str()
                 );
             }

@@ -1,11 +1,11 @@
+use ptree::PrintConfig;
+use std::collections::HashMap;
 use std::{
-    collections::HashMap,
     fmt,
     io::{BufReader, BufWriter},
 };
 
-use ptree::PrintConfig;
-
+use crate::node::TESTING;
 use crate::{
     id::{SymbolId, SymbolName},
     node::SyntaxNode,
@@ -26,7 +26,12 @@ pub struct SyntaxTree {
     pub functions: HashMap<SymbolId, FunctionRoot>,
 }
 
-const BUILT_INS: [&str; 3] = ["writeinteger", "writeunsigned", "readinteger"];
+const BUILT_INS: [&str; 4] = [
+    "writeinteger",
+    "writeunsigned",
+    "readinteger",
+    "readunsigned",
+];
 
 impl SyntaxTree {
     pub fn new() -> Self {
@@ -38,6 +43,18 @@ impl SyntaxTree {
     pub fn get_root(&mut self, id: &SymbolId) -> Option<&mut SyntaxNode> {
         self.functions.get_mut(id)?.tree.as_mut()
     }
+
+    /// For tests
+    pub fn get_func_by_name(&self, func: &str) -> Option<&FunctionRoot> {
+        self.functions.values().find(|f| f.name.0 == func)
+    }
+
+    pub fn get_print_config() -> PrintConfig {
+        PrintConfig {
+            indent: 5,
+            ..Default::default()
+        }
+    }
 }
 
 impl fmt::Display for SyntaxTree {
@@ -46,19 +63,13 @@ impl fmt::Display for SyntaxTree {
             if BUILT_INS.contains(&func.name.0.as_str()) {
                 continue;
             }
-
-            writeln!(f, "function `{}`", func.name)?;
+            if !*TESTING {
+                writeln!(f, "function `{}`", func.name)?;
+            }
             if let Some(tree) = &func.tree {
                 let mut buff = vec![];
-                ptree::write_tree_with(
-                    tree,
-                    &mut buff,
-                    &PrintConfig {
-                        indent: 5,
-                        ..Default::default()
-                    },
-                )
-                .expect("Error printing tree");
+                ptree::write_tree_with(tree, &mut buff, &SyntaxTree::get_print_config())
+                    .expect("Error printing tree");
                 let tree = String::from_utf8(buff).expect("Utf8 error printing tree");
                 writeln!(f, "{}", tree)?;
             } else {

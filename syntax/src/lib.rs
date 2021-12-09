@@ -10,11 +10,12 @@ mod tree_walker;
 mod visitor;
 
 use lexical::ParseTree;
-use std::error::Error;
+use std::{env, error::Error};
 use tree_walker::TreeWalker;
 use visitor::Visitor;
 
 pub use node::{NodeType, SyntaxNode};
+pub use syntax_tree::SyntaxTree;
 pub use visitor::SyntaxAnalysisResult;
 
 /// Take an input [ParseTree] and generate a [SyntaxResult] for it containing the syntax tree + symbol table.

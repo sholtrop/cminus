@@ -646,6 +646,7 @@ dependencies = [
  "clap",
  "general",
  "itertools",
+ "lazy_static 1.4.0",
  "lexical",
  "log",
  "ptree",
@@ -666,8 +667,10 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "general",
+ "itertools",
  "lexical",
  "log",
+ "ptree",
  "syntax",
 ]
 

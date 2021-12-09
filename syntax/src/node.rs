@@ -3,6 +3,12 @@ use core::fmt;
 use ptree::TreeItem;
 use std::{borrow::Cow, ops::Deref};
 
+use lazy_static::lazy_static;
+
+lazy_static! {
+    pub static ref TESTING: bool = std::env::var("TESTING").is_ok();
+}
+
 #[derive(PartialEq, Clone, Debug)]
 pub enum NodeType {
     Unknown,
@@ -150,11 +156,11 @@ impl<'a> Iterator for PreorderIter<'a> {
                     ref right,
                     ..
                 } => {
-                    if let Some(left) = left {
-                        self.stack.push(left.as_ref());
-                    }
                     if let Some(right) = right {
                         self.stack.push(right.as_ref());
+                    }
+                    if let Some(left) = left {
+                        self.stack.push(left.as_ref());
                     }
                 }
                 SyntaxNode::Unary {
@@ -213,9 +219,9 @@ impl SyntaxNode {
     /// If the coercion is valid, will return a unary coercion [SyntaxNode] with the `from` node as its child.
     pub fn coerce(from: SyntaxNode, to: ReturnType) -> SyntaxResult {
         let from_ret_t = from.return_type();
-        assert_ne!(from_ret_t, to);
-
-        if to == ReturnType::Bool || to == ReturnType::Error {
+        if from_ret_t == to {
+            Ok(from)
+        } else if to == ReturnType::Bool || to == ReturnType::Error {
             Ok(SyntaxNode::Unary {
                 child: Some(Box::new(from)),
                 node_type: NodeType::Coercion,
@@ -296,25 +302,6 @@ impl SyntaxNode {
 impl fmt::Display for SyntaxNode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SyntaxNode::Binary { node_type, .. } => {
-                writeln!(f, "bin:{}", node_type.to_string())
-            }
-            SyntaxNode::Constant { node_type, .. } => {
-                writeln!(f, "const:{}", node_type.to_string())
-            }
-            SyntaxNode::Empty => writeln!(f, "Empty"),
-            SyntaxNode::Symbol { node_type, .. } => {
-                writeln!(f, "sym:{}", node_type.to_string())
-            }
-            SyntaxNode::Unary { node_type, .. } => writeln!(f, "un:{}", node_type.to_string()),
-        }
-    }
-}
-
-impl ptree::TreeItem for SyntaxNode {
-    type Child = Self;
-    fn write_self<W: std::io::Write>(&self, f: &mut W, _: &ptree::Style) -> std::io::Result<()> {
-        match self {
             Self::Unary {
                 node_type,
                 return_type,
@@ -329,12 +316,25 @@ impl ptree::TreeItem for SyntaxNode {
                 node_type, value, ..
             } => write!(f, "{} - {}", node_type, value),
             Self::Symbol {
-                node_type,
                 symbol_id,
+                return_type,
                 ..
-            } => write!(f, "{} - Sym:{}", node_type, symbol_id),
+            } => {
+                if *TESTING {
+                    write!(f, "symbol - {}", return_type)
+                } else {
+                    write!(f, "symbol - Sym:{}", symbol_id)
+                }
+            }
             Self::Empty => write!(f, "[EMPTY]"),
         }
+    }
+}
+
+impl ptree::TreeItem for SyntaxNode {
+    type Child = Self;
+    fn write_self<W: std::io::Write>(&self, f: &mut W, _: &ptree::Style) -> std::io::Result<()> {
+        write!(f, "{}", self)
     }
     fn children(&self) -> Cow<[Self::Child]> {
         match self {

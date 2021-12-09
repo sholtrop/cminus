@@ -33,11 +33,13 @@ impl ScopeManager {
     }
 
     pub fn enter_new_scope(&mut self) {
-        self.scope_stack.push(Scope::new())
+        self.scope_stack.push(Scope::new());
+        log::trace!("ENTER NEW SCOPE {}", self.scope_stack.len());
     }
 
     pub fn leave_scope(&mut self) {
         self.scope_stack.pop();
+        log::trace!("LEAVE SCOPE {}", self.scope_stack.len());
     }
 
     pub fn add_symbol(&mut self, id: SymbolId, name: SymbolName) -> Result<(), SyntaxBuilderError> {
@@ -71,7 +73,7 @@ impl ScopeManager {
     }
 
     /// Whether the symbol with `name` is defined in the current scope.
-    /// (So `name` could also already be declared in higher scopes)
+    /// So not whether `name` is also declared in higher scopes.
     pub fn symbol_is_defined(&self, name: &SymbolName) -> bool {
         self.scope_stack
             .last()
