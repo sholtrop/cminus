@@ -1,12 +1,10 @@
-int superglobal;
-
 int main(void)
 {
     int a = 1;
-    if (a)
+    while (a)
     {
-        superglobal = 12;
-        writeinteger(superglobal);
+        a = a - 1;
+        writeinteger(22);
     }
     return 0;
 }

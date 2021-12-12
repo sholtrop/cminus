@@ -264,6 +264,12 @@ dependencies = [
 [[package]]
 name = "intermediate-code"
 version = "0.1.0"
+dependencies = [
+ "clap",
+ "general",
+ "log",
+ "syntax",
+]
 
 [[package]]
 name = "itertools"

@@ -12,7 +12,7 @@ mod visitor;
 use clap::clap_app;
 use general::logging;
 use log::LevelFilter;
-use syntax::{NodeType, SyntaxAnalysisResult, SyntaxNode};
+use syntax::SyntaxAnalysisResult;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = clap_app!(myapp =>
@@ -32,26 +32,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     logging::init_logger(level);
     let input = matches.value_of("INPUT").unwrap();
     let input = std::fs::read_to_string(input)?;
-    let parse_tree = lexical::parse(&input)?;
     let SyntaxAnalysisResult {
         errors,
         warnings,
         symbol_table,
         tree,
-    } = syntax::generate(parse_tree)?;
+    } = syntax::generate(&input)?;
     let has_errors = !errors.is_empty();
     if !has_errors || show_partial {
         log::info!("\n{}", symbol_table);
         log::info!("\n{}", tree);
     }
-    for (warning, line) in warnings {
-        log::warn!("Line {}: {}", line, warning);
-    }
     if has_errors {
-        for (err, line) in errors {
-            log::error!("Line {}: {}", line, err);
-        }
+        syntax::display_errors(&errors);
     }
-
+    syntax::display_warnings(&warnings);
     Ok(())
 }
