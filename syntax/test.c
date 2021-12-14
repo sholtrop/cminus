@@ -1,10 +1,6 @@
-int main(void)
+void main(void)
 {
-    int a = 1;
-    while (a)
+    if (1)
     {
-        a = a - 1;
-        writeinteger(22);
     }
-    return 0;
 }

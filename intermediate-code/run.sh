@@ -1,0 +1,1 @@
+RUST_LOG='intermediate_code=trace' cargo run "$@"

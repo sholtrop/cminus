@@ -92,12 +92,14 @@ impl TreeWalker {
                         _ => panic!("Expected function name"),
                     };
                 };
-                let id = match visitor.visit_func_start(SymbolType::Function, return_type, name) {
-                    Ok(id) => id,
-                    Err(e) => {
-                        return e.into();
-                    }
-                };
+                let id =
+                    match visitor.visit_func_start(SymbolType::Function, return_type, name.clone())
+                    {
+                        Ok(id) => id,
+                        Err(e) => {
+                            return e.into();
+                        }
+                    };
                 // Param declaration is handled in [Rule::parameter]
                 // We do need to check if that worked correctly, but don't need the return value
                 loop {
@@ -119,7 +121,10 @@ impl TreeWalker {
                     };
                 };
                 if return_type != ReturnType::Void && !self.func_has_return {
-                    visitor.add_error(&SyntaxBuilderError::from("Function has no return"));
+                    visitor.add_error(&SyntaxBuilderError(format!(
+                        "Function {} has no return, should return {}",
+                        name.0, return_type
+                    )));
                     return ParserValue::Skip;
                 }
                 if let Err(e) = visitor.visit_func_end(&id, func_body) {
@@ -173,10 +178,7 @@ impl TreeWalker {
                 loop {
                     match self.walk_tree(nodes.next(), visitor) {
                         ParserValue::Name(name) => {
-                            let id = match visitor.visit_var_decl(name, decl_type) {
-                                Ok(id) => id,
-                                Err(e) => return e.into(),
-                            };
+                            let id = visitor.visit_var_decl(name, decl_type);
                             current_id = Some(SyntaxNode::Symbol {
                                 node_type: NodeType::Id,
                                 return_type: decl_type,
@@ -278,19 +280,11 @@ impl TreeWalker {
                 } else {
                     visitor.visit_param_decl(ident, type_spec)
                 };
-                let id = match id {
-                    Ok(id) => id,
-                    Err(e) => {
-                        visitor.add_error(&e);
-                        return ParserValue::None;
-                    }
-                };
                 ParserValue::Id(id)
             }
             Rule::void => ParserValue::ReturnType(ReturnType::Void),
             Rule::fn_body => {
                 self.is_func_body = true;
-                // visitor.add_params_to_scope(self.current_line);
                 self.walk_tree(parse_node.into_inner().next(), visitor)
             }
             Rule::compound_stmt => {

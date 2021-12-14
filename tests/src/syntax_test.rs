@@ -59,9 +59,7 @@ mod specific_tests {
             let test_path = GLOBAL_PREFIX.to_owned() + PREFIX + "correct/simple_func.c";
             log::info!("Running test {}", test_path);
             let input = read_to_string(&test_path);
-            let contents = lexical::parse(input.as_str())
-                .expect("Could not lexically parse file for syntax test");
-            let result = syntax::generate(contents);
+            let result = syntax::generate(&input);
             assert!(result.is_ok());
             let result = result.unwrap();
             let table = result.symbol_table;
@@ -73,9 +71,7 @@ mod specific_tests {
                 GLOBAL_PREFIX.to_owned() + PREFIX + "correct/simple_func_param/simple_func_param.c";
             log::info!("Running test {}", test_path);
             let input = read_to_string(&test_path);
-            let contents = lexical::parse(input.as_str())
-                .expect("Could not lexically parse file for syntax test");
-            let result = syntax::generate(contents);
+            let result = syntax::generate(&input);
             assert!(result.is_ok());
             let result = result.unwrap();
             let table = result.symbol_table;
@@ -90,9 +86,7 @@ mod specific_tests {
                 GLOBAL_PREFIX.to_owned() + PREFIX + "correct/simple_var_assign/simple_var_assign.c";
             log::info!("Running test {}", test_path);
             let input = read_to_string(&test_path);
-            let contents = lexical::parse(input.as_str())
-                .expect("Could not lexically parse file for syntax test");
-            let result = syntax::generate(contents);
+            let result = syntax::generate(&input);
             assert!(result.is_ok());
             let result = result.unwrap();
             let table = result.symbol_table;
@@ -110,9 +104,7 @@ mod specific_tests {
             let test_path = PREFIX.to_owned() + "if_coercion.c";
             log::info!("Running test {}", test_path);
             let input = read_to_string(&test_path);
-            let contents = lexical::parse(input.as_str())
-                .expect("Could not lexically parse file for syntax test");
-            let result = syntax::generate(contents);
+            let result = syntax::generate(&input);
             assert!(result.is_ok());
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
@@ -153,9 +145,7 @@ mod specific_tests {
             let test_path = PREFIX.to_owned() + "while_coercion.c";
             log::info!("Running test {}", test_path);
             let input = read_to_string(&test_path);
-            let contents = lexical::parse(input.as_str())
-                .expect("Could not lexically parse file for syntax test");
-            let result = syntax::generate(contents);
+            let result = syntax::generate(&input);
             assert!(result.is_ok());
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
@@ -203,9 +193,7 @@ mod specific_tests {
             let test_path = PREFIX.to_owned() + "statementlist_empty.c";
             log::info!("Running test {}", test_path);
             let input = read_to_string(&test_path);
-            let contents = lexical::parse(input.as_str())
-                .expect("Could not lexically parse file for syntax test");
-            let result = syntax::generate(contents);
+            let result = syntax::generate(&input);
             assert!(result.is_ok());
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
@@ -220,9 +208,7 @@ mod specific_tests {
             let test_path = PREFIX.to_owned() + "statementlist_funccall.c";
             log::info!("Running test {}", test_path);
             let input = read_to_string(&test_path);
-            let contents = lexical::parse(input.as_str())
-                .expect("Could not lexically parse file for syntax test");
-            let result = syntax::generate(contents);
+            let result = syntax::generate(&input);
             assert!(result.is_ok());
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
@@ -249,9 +235,7 @@ mod specific_tests {
             let test_path = PREFIX.to_owned() + "assignment.c";
             log::info!("Running test {}", test_path);
             let input = read_to_string(&test_path);
-            let contents = lexical::parse(input.as_str())
-                .expect("Could not lexically parse file for syntax test");
-            let result = syntax::generate(contents);
+            let result = syntax::generate(&input);
             assert!(result.is_ok());
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
@@ -277,9 +261,7 @@ mod specific_tests {
             let test_path = PREFIX.to_owned() + "if_targets.c";
             log::info!("Running test {}", test_path);
             let input = read_to_string(&test_path);
-            let contents = lexical::parse(input.as_str())
-                .expect("Could not lexically parse file for syntax test");
-            let result = syntax::generate(contents);
+            let result = syntax::generate(&input);
             assert!(result.is_ok());
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
@@ -323,9 +305,7 @@ mod specific_tests {
             let test_path = PREFIX.to_owned() + "array.c";
             log::info!("Running test {}", test_path);
             let input = read_to_string(&test_path);
-            let contents = lexical::parse(input.as_str())
-                .expect("Could not lexically parse file for syntax test");
-            let result = syntax::generate(contents);
+            let result = syntax::generate(&input);
             assert!(result.is_ok());
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
@@ -364,9 +344,7 @@ mod specific_tests {
 }
 
 pub fn test_function(input: &str) -> Result<(), &str> {
-    let parsed = lexical::parse(input).expect("Could not lexically parse file for syntax test");
-
-    let result = syntax::generate(parsed);
+    let result = syntax::generate(&input);
     if let Err(err) = result {
         log::error!("{}", err);
         return Err("Error occurred");

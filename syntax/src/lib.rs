@@ -9,12 +9,12 @@ mod syntax_tree;
 mod tree_walker;
 mod visitor;
 
-use lexical::ParseTree;
 use std::error::Error;
 use tree_walker::TreeWalker;
 use visitor::Visitor;
 
 pub use error::*;
+pub use id::*;
 pub use node::*;
 pub use symbol::*;
 pub use symbol_table::*;

@@ -26,7 +26,7 @@ pub struct SyntaxTree {
     pub functions: HashMap<SymbolId, FunctionRoot>,
 }
 
-const BUILT_INS: [&str; 4] = [
+pub const BUILT_INS: [&str; 4] = [
     "writeinteger",
     "writeunsigned",
     "readinteger",
@@ -40,8 +40,8 @@ impl SyntaxTree {
         }
     }
 
-    pub fn get_root(&mut self, id: &SymbolId) -> Option<&mut SyntaxNode> {
-        self.functions.get_mut(id)?.tree.as_mut()
+    pub fn get_root(&self, id: &SymbolId) -> Option<&SyntaxNode> {
+        self.functions.get(id)?.tree.as_ref()
     }
 
     /// For tests

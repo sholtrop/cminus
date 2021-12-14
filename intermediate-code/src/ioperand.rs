@@ -1,9 +1,8 @@
 use std::fmt;
 
-use syntax::{ConstantNodeValue, ReturnType};
+use syntax::{ConstantNodeValue, ReturnType, SymbolId};
 
-use crate::id::ISymbolId;
-
+#[derive(Clone)]
 pub enum IOperand {
     Unknown,
     Immediate {
@@ -11,9 +10,25 @@ pub enum IOperand {
         ret_type: ReturnType,
     },
     Symbol {
-        id: ISymbolId,
+        id: SymbolId,
         ret_type: ReturnType,
     },
+}
+
+impl IOperand {
+    pub fn id(&self) -> SymbolId {
+        match self {
+            IOperand::Symbol { id, .. } => *id,
+            _ => panic!("id called on non-symbol operand"),
+        }
+    }
+
+    pub fn ret_type(&self) -> ReturnType {
+        match self {
+            IOperand::Immediate { ret_type, .. } | IOperand::Symbol { ret_type, .. } => *ret_type,
+            _ => panic!("ret_type called on unknown operand"),
+        }
+    }
 }
 
 impl fmt::Display for IOperand {
@@ -21,7 +36,7 @@ impl fmt::Display for IOperand {
         match self {
             Self::Unknown => write!(f, "unknown"),
             Self::Immediate { ret_type, value } => write!(f, "imm:{} {}", ret_type, value),
-            Self::Symbol { id, ret_type } => write!(f, "sym:{} {}", ret_type, id),
+            Self::Symbol { id, .. } => write!(f, "sym:{}", id),
         }
     }
 }

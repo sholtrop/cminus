@@ -1,6 +1,5 @@
 use crate::{error::SyntaxBuilderError, id::SymbolId, symbol::ReturnType, visitor::SyntaxResult};
 use core::fmt;
-use ptree::TreeItem;
 use std::{borrow::Cow, ops::Deref};
 
 use lazy_static::lazy_static;
@@ -94,6 +93,36 @@ impl fmt::Display for NodeType {
                 NodeType::SignMinus => "sign_minus",
                 NodeType::Coercion => "coercion",
             }
+        )
+    }
+}
+
+impl NodeType {
+    pub fn is_expression(&self) -> bool {
+        matches!(
+            self,
+            Self::Add
+                | Self::Sub
+                | Self::Or
+                | Self::Mul
+                | Self::Div
+                | Self::IDiv
+                | Self::Mod
+                | Self::And
+                | Self::Assignment
+                | Self::RelEqual
+                | Self::RelLT
+                | Self::RelGT
+                | Self::RelLTE
+                | Self::RelGTE
+                | Self::RelNotEqual
+                | Self::Num
+                | Self::Not
+                | Self::SignPlus
+                | Self::SignMinus
+                | Self::Coercion
+                | Self::FunctionCall
+                | Self::Id
         )
     }
 }
@@ -263,11 +292,20 @@ impl SyntaxNode {
         }
     }
 
+    pub fn symbol_id(&self) -> SymbolId {
+        if let SyntaxNode::Symbol { symbol_id, .. } = self {
+            *symbol_id
+        } else {
+            panic!("SyntaxNode::symbol_id called on non-symbol Node")
+        }
+    }
+
     pub fn preorder(&self) -> PreorderIter {
         PreorderIter::new(self)
     }
 
-    /*        assign => 0,
+    /*
+    assign => 0,
     or | and => 1,
     gt | gte | lt | lte => 2,
     eq | neq => 3,
@@ -295,6 +333,44 @@ impl SyntaxNode {
                 "Node {} is not an infix operator",
                 self
             )))
+        }
+    }
+
+    pub fn get_binary_children(&self) -> (Option<&SyntaxNode>, Option<&SyntaxNode>) {
+        if let SyntaxNode::Binary { left, right, .. } = self {
+            (left.as_deref(), right.as_deref())
+        } else {
+            panic!("Node {} was not binary", self);
+        }
+    }
+
+    /// Returns left and right child of a binary node.
+    /// Panics if the node is not binary or if either of the two children is [None].
+    pub fn get_both_binary_children(&self) -> (&SyntaxNode, &SyntaxNode) {
+        if let SyntaxNode::Binary { left, right, .. } = self {
+            (left.as_ref().unwrap(), right.as_ref().unwrap())
+        } else {
+            panic!("Node {} was not binary", self);
+        }
+    }
+
+    pub fn get_unary_child(&self) -> Option<&SyntaxNode> {
+        if let SyntaxNode::Unary { child, .. } = self {
+            child.as_deref()
+        } else {
+            panic!("Node {} was not unary", self);
+        }
+    }
+
+    /// Get a constant node's value
+    pub fn get_number(&self) -> ConstantNodeValue {
+        if let SyntaxNode::Constant { value, .. } = self {
+            if let ConstantNodeValue::ErrorMessage(_) = value {
+                panic!("Node was an error message: {}", self);
+            }
+            value.clone()
+        } else {
+            panic!("Node {} was not a number", self);
         }
     }
 }

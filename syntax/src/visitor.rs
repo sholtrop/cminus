@@ -12,10 +12,11 @@ use crate::syntax_tree::SyntaxTree;
 use crate::{
     builder::SyntaxBuilder,
     error::SyntaxBuilderError,
+    id::BUILTIN_IDS,
     id::{SymbolId, SymbolName},
     node::SyntaxNode,
     symbol::{ReturnType, Symbol, SymbolType},
-    symbol_table::SymbolTable,
+    symbol_table::{SymbolTable, SYMBOL_ID_ERROR},
 };
 
 pub struct SyntaxAnalysisResult {
@@ -69,9 +70,12 @@ impl Visitor {
                 SymbolName::from("writeinteger"),
             )
             .expect("Error adding builtins: Function `writeinteger` start");
-
-        self.visit_param_decl(SymbolName::from("i"), ReturnType::Int)
-            .expect("Error adding builtins: Param `i` for `writeinteger`");
+        assert_ne!(
+            self.visit_param_decl(SymbolName::from("i"), ReturnType::Int)
+                .0,
+            SYMBOL_ID_ERROR,
+            "Error adding builtins: Param `i` for `writeinteger`"
+        );
 
         self.visit_func_end(&id, SyntaxNode::Empty)
             .expect("Error adding builtins: Function `writeinteger` end");
@@ -83,10 +87,13 @@ impl Visitor {
                 SymbolName::from("writeunsigned"),
             )
             .expect("Error adding builtins: Function `writeunsigned` start");
-
-        self.visit_param_decl(SymbolName::from("i"), ReturnType::Uint)
-            .expect("Error adding builtins: Param `i` for `writeunsigned`");
-
+        assert_eq!(id.0, BUILTIN_IDS[1]);
+        assert_ne!(
+            self.visit_param_decl(SymbolName::from("i"), ReturnType::Uint)
+                .0,
+            SYMBOL_ID_ERROR,
+            "Error adding builtins: Param `i` for `writeunsigned`"
+        );
         self.visit_func_end(&id, SyntaxNode::Empty)
             .expect("Error adding builtins: Function `writeunsigned` end");
         // readinteger
@@ -97,6 +104,7 @@ impl Visitor {
                 SymbolName::from("readinteger"),
             )
             .expect("Error adding builtins: Function `readinteger` start");
+        assert_eq!(id.0, BUILTIN_IDS[2]);
         self.visit_func_end(&id, SyntaxNode::Empty)
             .expect("Error adding builtins: Function `readinteger` end");
         let id = self
@@ -106,6 +114,7 @@ impl Visitor {
                 SymbolName::from("readunsigned"),
             )
             .expect("Error adding builtins: Function `readunsigned` start");
+        assert_eq!(id.0, BUILTIN_IDS[3]);
         self.visit_func_end(&id, SyntaxNode::Empty)
             .expect("Error adding builtins: Function `readunsigned` end");
         self.current_line = old_line;
@@ -147,11 +156,7 @@ impl Visitor {
         Ok(id)
     }
 
-    pub fn visit_param_decl(
-        &mut self,
-        name: SymbolName,
-        return_type: ReturnType,
-    ) -> Result<SymbolId, SyntaxBuilderError> {
+    pub fn visit_param_decl(&mut self, name: SymbolName, return_type: ReturnType) -> SymbolId {
         self.builder
             .add_symbol(Symbol {
                 name,
@@ -159,20 +164,16 @@ impl Visitor {
                 symbol_type: SymbolType::Parameter,
                 line: self.current_line,
             })
-            .map_err(|err| {
+            .unwrap_or_else(|err| {
                 self.add_error(&err);
-                err
+                SymbolId(SYMBOL_ID_ERROR)
             })
     }
 
     /// Declare a new variable and return its [SymbolId].
     /// Returns an error if the variable has already been declared in this scope.
     /// TODO: Mentions parameter shadowing in error if applicable
-    pub fn visit_var_decl(
-        &mut self,
-        name: SymbolName,
-        return_type: ReturnType,
-    ) -> Result<SymbolId, SyntaxBuilderError> {
+    pub fn visit_var_decl(&mut self, name: SymbolName, return_type: ReturnType) -> SymbolId {
         self.builder
             .add_symbol(Symbol {
                 name,
@@ -180,9 +181,9 @@ impl Visitor {
                 symbol_type: SymbolType::Variable,
                 line: self.current_line,
             })
-            .map_err(|err| {
+            .unwrap_or_else(|err| {
                 self.add_error(&err);
-                err
+                SymbolId(SYMBOL_ID_ERROR)
             })
     }
 
@@ -580,22 +581,17 @@ impl Visitor {
         Ok(id)
     }
 
-    pub fn visit_array_param_decl(
-        &mut self,
-        name: SymbolName,
-        base_type: ReturnType,
-    ) -> Result<SymbolId, SyntaxBuilderError> {
+    pub fn visit_array_param_decl(&mut self, name: SymbolName, base_type: ReturnType) -> SymbolId {
         let arr_symbol = Symbol {
             line: self.current_line,
             name,
             return_type: base_type.to_array_type(),
             symbol_type: SymbolType::ArrayParam,
         };
-        let id = self.builder.add_symbol(arr_symbol).map_err(|err| {
+        self.builder.add_symbol(arr_symbol).unwrap_or_else(|err| {
             self.add_error(&err);
-            err
-        })?;
-        Ok(id)
+            SymbolId(SYMBOL_ID_ERROR)
+        })
     }
 
     pub fn add_error(&mut self, err: &SyntaxBuilderError) {

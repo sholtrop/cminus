@@ -7,4 +7,8 @@ pub mod logging {
             .filter_level(level)
             .init();
     }
+
+    pub fn init_logger_from_env() {
+        env_logger::builder().format_timestamp(None).init();
+    }
 }

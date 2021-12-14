@@ -1,10 +1,10 @@
 use std::fmt;
 
+use syntax::ConstantNodeValue;
+use syntax::NodeType;
 use syntax::ReturnType;
 
-use crate::id::ISymbolId;
-use syntax::ConstantNodeValue;
-
+#[derive(PartialEq)]
 pub enum IOperatorType {
     Void,
     Byte,
@@ -22,10 +22,25 @@ impl fmt::Display for IOperatorType {
                 Self::Void => "",
                 Self::Byte => "b",
                 Self::Word => "w",
-                Self::Double => "d",
+                Self::Double => "l",
                 Self::Quad => "q",
             }
         )
+    }
+}
+
+impl From<ReturnType> for IOperatorType {
+    fn from(rt: ReturnType) -> Self {
+        match rt {
+            ReturnType::Bool | ReturnType::Uint8 | ReturnType::Int8 => Self::Byte,
+            ReturnType::Uint | ReturnType::Int => Self::Double,
+            ReturnType::Real
+            | ReturnType::Int8Array
+            | ReturnType::Uint8Array
+            | ReturnType::UintArray
+            | ReturnType::IntArray => Self::Quad,
+            _ => unreachable!("Cannot convert {} to IOperatorType", rt),
+        }
     }
 }
 
@@ -97,7 +112,7 @@ impl fmt::Display for IOperator {
                 Self::Return => "RETURN",
                 Self::Param => "PARAM",
                 Self::FuncCall => "CALL_FUNC",
-                Self::Label => "LABEL",
+                Self::Label => "@LABEL",
                 Self::Goto => "GOTO",
                 Self::Assign => "ASSIGN",
                 Self::Larray => "LARRAY",
@@ -138,5 +153,19 @@ impl fmt::Display for IOperator {
                 Self::Coerce => "COERCE",
             }
         )
+    }
+}
+
+impl From<NodeType> for IOperator {
+    fn from(node_type: NodeType) -> Self {
+        match node_type {
+            NodeType::Add => Self::Add,
+            NodeType::Sub => Self::Sub,
+            NodeType::Mul => Self::Mul,
+            NodeType::Div => Self::Div,
+            NodeType::Assignment => Self::Assign,
+            NodeType::Unknown => Self::Unknown,
+            _ => unreachable!("Cannot convert {} to IOperator", node_type),
+        }
     }
 }

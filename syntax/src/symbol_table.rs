@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use crate::{
     id::*,
-    symbol::{Symbol, SymbolType},
+    symbol::{ReturnType, Symbol, SymbolType},
 };
 use std::borrow::Borrow;
 use std::{collections::HashMap, fmt};
@@ -25,6 +25,8 @@ pub struct FunctionInfo {
     pub variables: Vec<SymbolId>,
     pub parameters: Vec<SymbolId>,
 }
+
+pub const SYMBOL_ID_ERROR: usize = 0;
 
 #[derive(Default, Clone)]
 pub struct SymbolTable {
@@ -57,7 +59,7 @@ impl fmt::Display for SymbolTable {
         }
 
         writeln!(f, "\n#################### Symbols #####################")?;
-        writeln!(f, "(Excluding functions and builtins)")?;
+        writeln!(f, "(Excluding builtins)")?;
         writeln!(
             f,
             "{:<13} {:<13} {:<13} {:<13}",
@@ -70,7 +72,7 @@ impl fmt::Display for SymbolTable {
             .sorted_by(|(a, _), (b, _)| a.0.cmp(&b.0))
         {
             let symbol = &info.symbol;
-            if symbol.symbol_type != SymbolType::Function && symbol.line > 0 {
+            if !id.is_builtin() {
                 writeln!(
                     f,
                     "{:<13} {:<13} {:<13} {:<13}",
@@ -90,12 +92,20 @@ impl SymbolTable {
         SymbolTable {
             symbols: HashMap::new(),
             functions: HashMap::new(),
-            id_count: 0,
+            id_count: SYMBOL_ID_ERROR + 1,
         }
     }
 
     pub fn get_symbol(&self, id: &SymbolId) -> Option<&Symbol> {
         Some(&self.symbols.get(id)?.symbol)
+    }
+
+    pub fn get_function_ids(&self) -> Vec<SymbolId> {
+        self.functions
+            .keys()
+            .cloned()
+            .sorted_by_key(|x| x.0)
+            .collect()
     }
 
     pub fn add_symbol(&mut self, symbol: Symbol, scope: SymbolScope) -> SymbolId {
@@ -171,6 +181,39 @@ impl SymbolTable {
             symbols.push(self.symbols.get(id)?.symbol.clone());
         }
         Some(symbols)
+    }
+
+    pub fn add_label(&mut self, name: String, func_id: SymbolId) -> SymbolId {
+        self.add_symbol(
+            Symbol {
+                name: SymbolName(name),
+                symbol_type: SymbolType::Label,
+                line: 0,
+                return_type: ReturnType::Void,
+            },
+            SymbolScope::Local {
+                owning_function: func_id,
+            },
+        )
+    }
+
+    pub fn add_tempvar(
+        &mut self,
+        return_type: ReturnType,
+        name: String,
+        func_id: SymbolId,
+    ) -> SymbolId {
+        self.add_symbol(
+            Symbol {
+                name: SymbolName(name),
+                symbol_type: SymbolType::TempVar,
+                line: 0,
+                return_type,
+            },
+            SymbolScope::Local {
+                owning_function: func_id,
+            },
+        )
     }
 
     /// For tests

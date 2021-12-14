@@ -111,10 +111,6 @@ impl SyntaxBuilder {
     }
 
     pub fn add_symbol(&mut self, symbol: Symbol) -> Result<SymbolId, SyntaxBuilderError> {
-        // if self.scope_manager.symbol_is_defined(&symbol.name) {
-        //     return Err(format!("Symbol `{}` redefined in current scope", symbol.name).into());
-        // }
-
         let scope = if let Some(id) = self.current_function {
             SymbolScope::Local {
                 owning_function: id,
@@ -136,22 +132,4 @@ impl SyntaxBuilder {
     pub fn leave_scope(&mut self) {
         self.scope_manager.leave_scope()
     }
-
-    // Adds the parameters of the current function to the current scope.
-    // Panics if there is no current function, i.e. we are in the global scope.
-    // pub fn add_params_to_scope(&mut self) -> Result<(), SyntaxBuilderError> {
-    //     let id = self.current_function.unwrap();
-    //     for param in self.get_parameters(&id).unwrap() {
-    //         self.scope_manager
-    //             .add_symbol(id, param.name.clone())
-    //             .map_err(|_| {
-    //                 SyntaxBuilderError(format!(
-    //                     "Multiple parameters with name `{}` for function {}",
-    //                     param.name,
-    //                     self.get_symbol_by_id(&id).unwrap().name
-    //                 ))
-    //             })?;
-    //     }
-    //     Ok(())
-    // }
 }
