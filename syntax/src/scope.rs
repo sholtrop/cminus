@@ -1,14 +1,11 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    ops::Deref,
-};
+use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
     error::SyntaxBuilderError,
     id::{SymbolId, SymbolName},
-    symbol::Symbol,
 };
 
+#[derive(Default)]
 pub struct Scope {
     pub symbols: HashMap<SymbolName, SymbolId>,
 }
@@ -20,7 +17,7 @@ impl Scope {
         }
     }
 }
-
+#[derive(Default)]
 pub struct ScopeManager {
     scope_stack: Vec<Scope>,
 }

@@ -1,13 +1,13 @@
-mod builder;
-mod error;
-mod id;
-mod node;
-mod scope;
-mod symbol;
-mod symbol_table;
-mod syntax_tree;
-mod tree_walker;
-mod visitor;
+pub mod builder;
+pub mod error;
+pub mod id;
+pub mod node;
+pub mod scope;
+pub mod symbol;
+pub mod symbol_table;
+pub mod syntax_tree;
+pub mod tree_walker;
+pub mod visitor;
 
 use clap::clap_app;
 use general::logging;

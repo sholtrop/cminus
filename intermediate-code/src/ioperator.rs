@@ -1,6 +1,5 @@
 use std::fmt;
 
-use syntax::ConstantNodeValue;
 use syntax::NodeType;
 use syntax::ReturnType;
 

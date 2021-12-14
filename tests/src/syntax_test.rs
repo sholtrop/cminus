@@ -1,4 +1,3 @@
-use lexical::ParseTree;
 use std::io;
 use syntax::{NodeType, SyntaxAnalysisResult};
 use tests::{collect_tests_in_path, run_single_test, TestStats};
@@ -8,10 +7,7 @@ const UNIT_TEST_PATH: &str = "tests/testfiles/general/units";
 const SYNTAX_TEST_PATH: &str = "tests/testfiles/syntax";
 
 mod specific_tests {
-    use super::*;
     use itertools::{self, EitherOrBoth, Itertools};
-    use lexical::ParseTree;
-    use std::array::IntoIter;
     use syntax::SyntaxNode;
 
     const GLOBAL_PREFIX: &str = "tests/testfiles/general/units/";
@@ -344,7 +340,7 @@ mod specific_tests {
 }
 
 pub fn test_function(input: &str) -> Result<(), &str> {
-    let result = syntax::generate(&input);
+    let result = syntax::generate(input);
     if let Err(err) = result {
         log::error!("{}", err);
         return Err("Error occurred");

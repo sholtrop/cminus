@@ -1,19 +1,16 @@
 use std::borrow::Borrow;
-use std::collections::hash_map::Entry;
-
-use lexical::{ParseTree, Rule};
 
 use crate::{
     error::SyntaxBuilderError,
     id::{SymbolId, SymbolName},
-    node::{NodeType, SyntaxNode},
-    scope::{Scope, ScopeManager},
-    symbol::{ReturnType, Symbol, SymbolType},
+    node::SyntaxNode,
+    scope::ScopeManager,
+    symbol::Symbol,
     symbol_table::{SymbolScope, SymbolTable},
     syntax_tree::{FunctionRoot, SyntaxTree},
-    visitor::{SyntaxAnalysisResult, Visitor},
 };
 
+#[derive(Default)]
 pub struct SyntaxBuilder {
     table: SymbolTable,
     tree: SyntaxTree,

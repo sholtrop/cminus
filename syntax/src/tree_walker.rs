@@ -1,9 +1,9 @@
 use std::collections::VecDeque;
 
 use crate::{
-    error::{SyntaxBuilderError, SyntaxBuilderWarning},
+    error::SyntaxBuilderError,
     id::{SymbolId, SymbolName},
-    node::{ConstantNodeValue, NodeType, SyntaxNode},
+    node::{NodeType, SyntaxNode},
     symbol::{ReturnType, Symbol, SymbolType},
     visitor::Visitor,
 };
@@ -31,6 +31,7 @@ impl From<SyntaxBuilderError> for ParserValue {
     }
 }
 
+#[derive(Default)]
 pub struct TreeWalker {
     // current_line: usize,
     current_decl_type: Option<ReturnType>,

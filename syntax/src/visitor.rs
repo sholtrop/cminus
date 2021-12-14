@@ -1,10 +1,5 @@
 use itertools::{EitherOrBoth, Itertools};
-use lexical::{ParseNode, ParseTree};
-use std::borrow::{Borrow, BorrowMut};
-use std::cell::{RefCell, RefMut};
 use std::cmp::Ordering;
-use std::ops::DerefMut;
-use std::{collections::HashMap, rc::Rc};
 
 use crate::error::SyntaxBuilderWarning;
 use crate::node::{ConstantNodeValue, NodeType};
@@ -29,6 +24,7 @@ pub struct SyntaxAnalysisResult {
 type ErrorWithLineno = (SyntaxBuilderError, usize);
 type WarningWithLineno = (SyntaxBuilderWarning, usize);
 
+#[derive(Default)]
 pub struct Visitor {
     builder: SyntaxBuilder,
     errors: Vec<ErrorWithLineno>,
@@ -392,8 +388,6 @@ impl Visitor {
         if_body: SyntaxNode,
         else_body: Option<SyntaxNode>,
     ) -> SyntaxNode {
-        let cond_ret = condition.return_type();
-
         condition = match SyntaxNode::coerce(condition, ReturnType::Bool) {
             Ok(n) => n,
             Err(err) => {

@@ -2,7 +2,7 @@ use crate::intermediate_code::IntermediateCode;
 use crate::ioperand::IOperand;
 use crate::ioperator::{IOperator, IOperatorType};
 use crate::istatement::IStatement;
-use syntax::{NodeType::*, ReturnType, SymbolName};
+use syntax::{NodeType::*, ReturnType};
 use syntax::{SymbolId, SyntaxNode};
 
 pub struct IVisitor<'a> {

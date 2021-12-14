@@ -11,8 +11,7 @@ pub mod ivisitor;
 use crate::error::ICodeError;
 use ::intermediate_code::OptLevel;
 use clap::clap_app;
-use general::logging::{init_logger, init_logger_from_env};
-use log::LevelFilter;
+use general::logging::init_logger_from_env;
 use syntax::SyntaxAnalysisResult;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
