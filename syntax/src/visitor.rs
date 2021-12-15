@@ -251,6 +251,7 @@ impl Visitor {
                 _ => {}
             };
 
+            // TODO: Just use `zip`
             for pair in actual_args.zip_longest(formal_args).rev() {
                 if let EitherOrBoth::Both(mut actual_arg, formal_arg) = pair {
                     actual_arg = SyntaxNode::coerce(actual_arg, formal_arg.return_type)

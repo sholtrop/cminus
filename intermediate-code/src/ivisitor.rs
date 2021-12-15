@@ -35,6 +35,7 @@ impl<'a> IVisitor<'a> {
             return;
         }
         match ntype {
+            Empty => {}
             StatementList => {
                 let (l, r) = node.get_binary_children();
                 self.accept(l.expect("Left of StatementList was None"));
@@ -44,13 +45,21 @@ impl<'a> IVisitor<'a> {
             }
             If => {
                 let (cond, targets) = node.get_both_binary_children();
+
+                // if without else
                 let (if_body, else_body) = if targets.node_type() == StatementList {
                     (targets, None)
-                } else {
+                }
+                // if with else
+                else {
                     let (if_body, else_body) = targets.get_both_binary_children();
                     (if_body, Some(else_body))
                 };
                 self.visit_if_else(cond, if_body, else_body);
+            }
+            While => {
+                let (cond, body) = node.get_both_binary_children();
+                self.visit_while(cond, body);
             }
             _ => {
                 unimplemented!("{:?}", node.node_type());
@@ -105,6 +114,10 @@ impl<'a> IVisitor<'a> {
                 });
                 postcoercion
             }
+            FunctionCall => {
+                let (func, args) = exp.get_both_binary_children();
+                self.visit_func_call(func, args)
+            }
             Num => {
                 let num = exp.get_number();
                 IOperand::Immediate {
@@ -138,14 +151,13 @@ impl<'a> IVisitor<'a> {
         let name = self.table.get_symbol(&func_id).unwrap().name.clone();
         log::trace!("Visiting function {}", name);
         self.func_stack.push(func_id);
-        let id = self.make_label();
         let label_istmt = IOperand::Symbol {
-            id,
+            id: func_id,
             ret_type: ReturnType::Void,
         };
         self.icode.append_statement(IStatement {
             op_type: IOperatorType::Void,
-            operator: IOperator::Label,
+            operator: IOperator::Func,
             operand1: Some(label_istmt),
             operand2: None,
             ret_target: None,
@@ -211,6 +223,75 @@ impl<'a> IVisitor<'a> {
             // end-else label
             self.icode
                 .append_statement(IStatement::make_label(end_else_label));
+        }
+    }
+
+    fn visit_while(&mut self, cond: &SyntaxNode, body: &SyntaxNode) {
+        let start_loop = self.make_label();
+        let end_loop = self.make_label();
+        // start label
+        self.icode
+            .append_statement(IStatement::make_label(start_loop));
+        // eval expression
+        let cond_expr = self.accept_expression(cond);
+        // jump over while body if expression is false
+        self.icode.append_statement(IStatement {
+            op_type: IOperatorType::Void,
+            operator: IOperator::Jz,
+            operand1: Some(cond_expr),
+            operand2: None,
+            ret_target: Some(IOperand::Symbol {
+                id: end_loop,
+                ret_type: ReturnType::Void,
+            }),
+        });
+        // while-body
+        self.accept(body);
+        // jump to beginning of loop
+        self.icode
+            .append_statement(IStatement::make_goto(start_loop));
+        // end label
+        self.icode
+            .append_statement(IStatement::make_label(end_loop));
+    }
+
+    fn visit_func_call(&mut self, func: &SyntaxNode, args: &SyntaxNode) -> IOperand {
+        let func_id = func.symbol_id();
+        let ret_type = self.table.get_symbol(&func_id).unwrap().return_type;
+        let ret_temp = self.make_temp(ret_type);
+        let ret_temp = IOperand::Symbol {
+            id: ret_temp,
+            ret_type,
+        };
+
+        self.visit_expr_list(args);
+        self.icode.append_statement(IStatement {
+            op_type: ret_type.into(),
+            operator: IOperator::FuncCall,
+            operand1: Some(IOperand::Symbol {
+                id: func_id,
+                ret_type,
+            }),
+            operand2: None,
+            ret_target: Some(ret_temp.clone()),
+        });
+        ret_temp
+    }
+
+    fn visit_expr_list(&mut self, expr_list: &SyntaxNode) {
+        let (current_exp_node, next) = expr_list.get_binary_children();
+        if let Some(exp_node) = current_exp_node {
+            let exp = self.accept_expression(exp_node);
+            self.icode.append_statement(IStatement {
+                op_type: exp_node.return_type().into(),
+                operator: IOperator::Param,
+                operand1: Some(exp),
+                operand2: None,
+                ret_target: None,
+            });
+            if let Some(next) = next {
+                self.visit_expr_list(next);
+            }
         }
     }
 

@@ -102,9 +102,16 @@ impl SyntaxBuilder {
     }
 
     pub fn get_parameters(&self, id: &SymbolId) -> Result<Vec<Symbol>, SyntaxBuilderError> {
-        self.table.get_func_param_symbols(id).ok_or_else(|| {
-            SyntaxBuilderError(format!("Symbol with id {} not found in function table", id))
-        })
+        let syms = self
+            .table
+            .get_func_param_symbols(id)
+            .ok_or_else(|| {
+                SyntaxBuilderError(format!("Symbol with id {} not found in function table", id))
+            })?
+            .into_iter()
+            .map(|(_, sym)| sym)
+            .collect();
+        Ok(syms)
     }
 
     pub fn add_symbol(&mut self, symbol: Symbol) -> Result<SymbolId, SyntaxBuilderError> {

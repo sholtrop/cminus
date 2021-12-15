@@ -1,6 +1,8 @@
+void miep(int a)
+{
+}
+
 void main(void)
 {
-    if (1)
-    {
-    }
+    miep(1);
 }

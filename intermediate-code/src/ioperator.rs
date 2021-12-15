@@ -31,6 +31,7 @@ impl fmt::Display for IOperatorType {
 impl From<ReturnType> for IOperatorType {
     fn from(rt: ReturnType) -> Self {
         match rt {
+            ReturnType::Void => Self::Void,
             ReturnType::Bool | ReturnType::Uint8 | ReturnType::Int8 => Self::Byte,
             ReturnType::Uint | ReturnType::Int => Self::Double,
             ReturnType::Real
