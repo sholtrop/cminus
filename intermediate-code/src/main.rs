@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = clap_app!(myapp =>
         (version: "1.0")
         (about: "Produce intermediate code for the given input C-minus file")
-        // (@arg verbose: -v --verbose "Print debug information")
+        (@arg annotate: -a --annotate "Also print the annotated intermediate code")
         (@arg INPUT: +required "Sets the input")
     )
     .get_matches();
@@ -28,6 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //     LevelFilter::Info
     // };
     init_logger_from_env();
+    let annotate = matches.is_present("annotate");
     let input = matches.value_of("INPUT").unwrap();
     let input = std::fs::read_to_string(input)?;
     let SyntaxAnalysisResult {
@@ -52,6 +53,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match ic {
         Ok(ic) => {
             log::info!("\n{}", ic);
+            if annotate {
+                log::info!(
+                    "\nAnnotated:\n{}",
+                    symbol_table.annotate_icode(ic.to_string())
+                );
+            }
             Ok(())
         }
         Err(e) => Err(Box::new(e)),

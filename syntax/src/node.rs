@@ -248,6 +248,9 @@ impl SyntaxNode {
     /// If the coercion is valid, will return a unary coercion [SyntaxNode] with the `from` node as its child.
     pub fn coerce(from: SyntaxNode, to: ReturnType) -> SyntaxResult {
         let from_ret_t = from.return_type();
+        if from_ret_t == ReturnType::Void {
+            return Err("Expression must have a return value".into());
+        }
         if from_ret_t == to {
             Ok(from)
         } else if to == ReturnType::Bool || to == ReturnType::Error {

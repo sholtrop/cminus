@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use regex::Regex;
 
 use crate::{
     id::*,
@@ -215,6 +216,29 @@ impl SymbolTable {
                 owning_function: func_id,
             },
         )
+    }
+
+    pub fn annotate_icode(&self, icode: String) -> String {
+        let mut annotated = String::new();
+        for line in icode.split('\n') {
+            for part in line.split(' ') {
+                let re = Regex::new(r"\[sym:(\d+)\]").unwrap();
+                if let Some(c) = re.captures(part) {
+                    let num: usize = c.get(1).unwrap().as_str().parse().unwrap();
+                    let symbol = self.get_symbol(&SymbolId(num)).unwrap();
+                    if symbol.symbol_type == SymbolType::TempVar {
+                        annotated += format!("[t{}]", symbol.name).as_str();
+                    } else {
+                        annotated += format!("[{}]", symbol.name).as_str();
+                    }
+                } else {
+                    annotated += part;
+                }
+                annotated += " ";
+            }
+            annotated += "\n";
+        }
+        annotated
     }
 
     /// For tests

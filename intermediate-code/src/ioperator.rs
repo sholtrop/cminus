@@ -44,6 +44,7 @@ impl From<ReturnType> for IOperatorType {
     }
 }
 
+#[derive(PartialEq)]
 pub enum IOperator {
     Unknown,
     Func,

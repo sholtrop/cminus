@@ -61,6 +61,10 @@ impl<'a> IVisitor<'a> {
                 let (cond, body) = node.get_both_binary_children();
                 self.visit_while(cond, body);
             }
+            Return => {
+                let ret_child = node.get_unary_child();
+                self.visit_return(ret_child);
+            }
             _ => {
                 unimplemented!("{:?}", node.node_type());
             }
@@ -68,7 +72,8 @@ impl<'a> IVisitor<'a> {
     }
 
     fn accept_expression(&mut self, exp: &SyntaxNode) -> IOperand {
-        match exp.node_type() {
+        let ntype = exp.node_type();
+        match ntype {
             Assignment => {
                 let (l, r) = exp.get_both_binary_children();
                 self.visit_assignment(l, r)
@@ -101,7 +106,7 @@ impl<'a> IVisitor<'a> {
             }
             Coercion => {
                 let child = exp.get_unary_child().unwrap();
-                let ret_type = child.return_type();
+                let ret_type = exp.return_type();
                 let temp = self.make_temp(ret_type);
                 let precoercion = self.accept_expression(child);
                 let postcoercion = IOperand::Symbol { id: temp, ret_type };
@@ -139,6 +144,45 @@ impl<'a> IVisitor<'a> {
                 } else {
                     unreachable!()
                 }
+            }
+            Not => {
+                let child = exp.get_unary_child().unwrap();
+                let child_exp = self.accept_expression(child);
+                let ret_target = self.make_temp(ReturnType::Bool);
+                let ret_target = IOperand::Symbol {
+                    id: ret_target,
+                    ret_type: ReturnType::Bool,
+                };
+                self.icode.append_statement(IStatement {
+                    op_type: IOperatorType::Byte,
+                    operator: IOperator::Not,
+                    operand1: Some(child_exp),
+                    operand2: None,
+                    ret_target: Some(ret_target.clone()),
+                });
+                ret_target
+            }
+            SignMinus => {
+                let child = exp.get_unary_child().unwrap();
+                let ret_type = child.return_type();
+                let child_exp = self.accept_expression(child);
+                let ret_target = self.make_temp(ret_type);
+                let ret_target = IOperand::Symbol {
+                    id: ret_target,
+                    ret_type,
+                };
+                self.icode.append_statement(IStatement {
+                    op_type: ret_type.into(),
+                    operator: IOperator::Minus,
+                    operand1: Some(child_exp),
+                    operand2: None,
+                    ret_target: Some(ret_target.clone()),
+                });
+                ret_target
+            }
+            SignPlus => {
+                let child = exp.get_unary_child().unwrap();
+                self.accept_expression(child)
             }
             _ => unreachable!("Node `{}` is not (part of) an expression", exp),
         }
@@ -293,6 +337,17 @@ impl<'a> IVisitor<'a> {
                 self.visit_expr_list(next);
             }
         }
+    }
+
+    fn visit_return(&mut self, ret: Option<&SyntaxNode>) {
+        let ret_exp = ret.map(|r| self.accept_expression(r));
+        self.icode.append_statement(IStatement {
+            op_type: IOperatorType::Void,
+            operator: IOperator::Return,
+            operand1: ret_exp,
+            operand2: None,
+            ret_target: None,
+        });
     }
 
     fn make_temp(&mut self, ret_type: ReturnType) -> SymbolId {

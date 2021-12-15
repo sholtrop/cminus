@@ -1,8 +1,9 @@
-void miep(int a)
+int miep(int a)
 {
+    return 1;
 }
 
 void main(void)
 {
-    miep(1);
+    !miep(1);
 }
