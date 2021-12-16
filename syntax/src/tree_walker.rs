@@ -123,7 +123,7 @@ impl TreeWalker {
                 };
                 if return_type != ReturnType::Void && !self.func_has_return {
                     visitor.add_error(&SyntaxBuilderError(format!(
-                        "Function {} has no return, should return {}",
+                        "Function `{}` has no return, should return {}",
                         name.0, return_type
                     )));
                     return ParserValue::Skip;

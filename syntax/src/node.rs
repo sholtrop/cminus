@@ -123,6 +123,7 @@ impl NodeType {
                 | Self::Coercion
                 | Self::FunctionCall
                 | Self::Id
+                | Self::RArray
         )
     }
 }

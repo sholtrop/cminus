@@ -1,9 +1,5 @@
-int miep(int a)
-{
-    return 1;
-}
-
 void main(void)
 {
-    !miep(1);
+    int a[1];
+    a[0] = 1;
 }

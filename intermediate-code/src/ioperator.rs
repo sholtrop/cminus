@@ -44,6 +44,18 @@ impl From<ReturnType> for IOperatorType {
     }
 }
 
+impl From<IOperatorType> for usize {
+    fn from(opt: IOperatorType) -> Self {
+        match opt {
+            IOperatorType::Byte => 1,
+            IOperatorType::Word => 2,
+            IOperatorType::Double => 4,
+            IOperatorType::Quad => 8,
+            IOperatorType::Void => 0,
+        }
+    }
+}
+
 #[derive(PartialEq)]
 pub enum IOperator {
     Unknown,

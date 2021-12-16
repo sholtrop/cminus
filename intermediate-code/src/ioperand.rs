@@ -29,6 +29,19 @@ impl IOperand {
             _ => panic!("ret_type called on unknown operand"),
         }
     }
+
+    pub fn from_symbol(id: SymbolId, ret_type: ReturnType) -> Self {
+        Self::Symbol { id, ret_type }
+    }
+}
+
+impl From<usize> for IOperand {
+    fn from(imm: usize) -> Self {
+        Self::Immediate {
+            ret_type: ReturnType::Int,
+            value: ConstantNodeValue::Int(imm as i32),
+        }
+    }
 }
 
 impl fmt::Display for IOperand {

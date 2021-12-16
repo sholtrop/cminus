@@ -109,6 +109,13 @@ impl ReturnType {
             _ => self,
         }
     }
+
+    pub fn is_array(&self) -> bool {
+        matches!(
+            self,
+            Self::IntArray | Self::Int8Array | Self::UintArray | Self::Uint8Array
+        )
+    }
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]

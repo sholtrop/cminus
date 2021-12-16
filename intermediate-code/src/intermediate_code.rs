@@ -27,8 +27,12 @@ impl IntermediateCode {
         self.statements.remove(index);
     }
 
-    pub fn get_statement(&self, idx: usize) -> &IStatement {
-        &self.statements[idx]
+    /// Can give a negative index, which will index starting from the end of the statement list counting backwards.
+    pub fn get_statement(&self, mut idx: i32) -> &IStatement {
+        if idx < 0 {
+            idx += self.n_statements() as i32;
+        }
+        &self.statements[idx as usize]
     }
 }
 

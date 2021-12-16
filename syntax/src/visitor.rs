@@ -427,7 +427,7 @@ impl Visitor {
 
         SyntaxNode::Binary {
             node_type: NodeType::Assignment,
-            return_type: ret_type,
+            return_type: ret_type.to_base_type(),
             left: Some(Box::new(lvar)),
             right: Some(Box::new(exp)),
         }
@@ -541,7 +541,7 @@ impl Visitor {
         };
         SyntaxNode::Binary {
             node_type: NodeType::LArray,
-            return_type: symbol.return_type.to_base_type(),
+            return_type: symbol.return_type,
             left: Some(Box::new(id_node)),
             right: Some(Box::new(expr)),
         }

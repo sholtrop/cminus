@@ -71,8 +71,13 @@ impl<'a> IVisitor<'a> {
         }
     }
 
+    // TODO:
+    // implement short-circuiting, i.e.
+    // int x = 0 && func();
+    // should never call `func`
     fn accept_expression(&mut self, exp: &SyntaxNode) -> IOperand {
         let ntype = exp.node_type();
+        log::trace!("Expression: {}", ntype);
         match ntype {
             Assignment => {
                 let (l, r) = exp.get_both_binary_children();
@@ -123,6 +128,7 @@ impl<'a> IVisitor<'a> {
                 let (func, args) = exp.get_both_binary_children();
                 self.visit_func_call(func, args)
             }
+            RArray => self.visit_rarray_access(exp),
             Num => {
                 let num = exp.get_number();
                 IOperand::Immediate {
@@ -214,12 +220,16 @@ impl<'a> IVisitor<'a> {
     }
 
     fn visit_assignment(&mut self, l_var: &SyntaxNode, r_expr: &SyntaxNode) -> IOperand {
-        let common_ret = l_var.return_type();
-        let ret_target = IOperand::Symbol {
-            id: l_var.symbol_id(),
-            ret_type: common_ret,
+        log::trace!("Assignment: {} | {}", l_var, r_expr);
+        let common_ret = l_var.return_type().to_base_type();
+        let ret_target = if l_var.return_type().is_array() {
+            self.visit_larray_access(l_var)
+        } else {
+            IOperand::Symbol {
+                id: l_var.symbol_id(),
+                ret_type: common_ret,
+            }
         };
-
         let r_expr = self.accept_expression(r_expr);
         self.icode.append_statement(IStatement {
             op_type: common_ret.into(),
@@ -348,6 +358,62 @@ impl<'a> IVisitor<'a> {
             operand2: None,
             ret_target: None,
         });
+    }
+
+    fn visit_larray_access(&mut self, node: &SyntaxNode) -> IOperand {
+        let (array, access) = node.get_both_binary_children();
+        log::trace!("LArray - array: {}, access: {}", array, access);
+        let array_id = array.symbol_id();
+        let ret_type = array.return_type().to_base_type();
+        let write_val = self
+            .icode
+            .get_statement(-2)
+            .ret_target
+            .as_ref()
+            .expect(
+                "Could not get return value of second-to-last statement as value to put into array",
+            )
+            .clone();
+        let access_with_offset = self.calc_array_index(ret_type, access);
+        let ret_target = IOperand::from_symbol(array_id, ret_type);
+        self.icode.append_statement(IStatement {
+            op_type: ret_type.into(),
+            operator: IOperator::Larray,
+            operand1: Some(write_val),
+            operand2: Some(access_with_offset),
+            ret_target: Some(ret_target.clone()),
+        });
+        ret_target
+    }
+
+    fn visit_rarray_access(&mut self, node: &SyntaxNode) -> IOperand {
+        let (array, access) = node.get_both_binary_children();
+        let array_id = array.symbol_id();
+        let ret_type = array.return_type().to_base_type();
+        let access_with_offset = self.calc_array_index(ret_type, access);
+        let array_access_retval = IOperand::from_symbol(self.make_temp(ret_type), ret_type);
+        self.icode.append_statement(IStatement {
+            op_type: ret_type.into(),
+            operator: IOperator::Rarray,
+            operand1: Some(IOperand::from_symbol(array_id, ret_type)),
+            operand2: Some(access_with_offset),
+            ret_target: Some(array_access_retval.clone()),
+        });
+        array_access_retval
+    }
+
+    fn calc_array_index(&mut self, base_type: ReturnType, access: &SyntaxNode) -> IOperand {
+        let type_size: usize = IOperatorType::from(base_type).into();
+        let acccess_exp = self.accept_expression(access);
+        let access_with_offset = IOperand::from_symbol(self.make_temp(base_type), base_type);
+        self.icode.append_statement(IStatement {
+            op_type: IOperatorType::Double,
+            operator: IOperator::Mul,
+            operand1: Some(IOperand::from(type_size)),
+            operand2: Some(acccess_exp),
+            ret_target: Some(access_with_offset.clone()),
+        });
+        access_with_offset
     }
 
     fn make_temp(&mut self, ret_type: ReturnType) -> SymbolId {

@@ -120,8 +120,8 @@
           "kind": "bin"
         }
       },
-      "args": [],
-      "cwd": "${workspaceFolder}"
+      "args": ["test.c"],
+      "cwd": "${workspaceFolder}/intermediate-code"
     },
     {
       "type": "lldb",
