@@ -310,11 +310,11 @@ mod specific_tests {
             let expectation = [
                 "statement_list - void",
                     "assignment - int",
-                        "l_array - int",
+                        "array_access - int",
                             "symbol - int_array",
                             "num - 0",
                         "coercion - int",
-                        "num - 42",
+                            "num - 42",
                 "statement_list - void",
                     "return - int",
                         "coercion - int",

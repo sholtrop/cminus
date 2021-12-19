@@ -262,11 +262,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "intermediate-code"
+name = "intermediate_code"
 version = "0.1.0"
 dependencies = [
  "clap",
  "general",
+ "lexical",
  "log",
  "syntax",
 ]
@@ -674,6 +675,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "general",
+ "intermediate_code",
  "itertools",
  "lexical",
  "log",

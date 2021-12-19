@@ -98,7 +98,7 @@ impl TreeWalker {
                     {
                         Ok(id) => id,
                         Err(e) => {
-                            return e.into();
+                            return ParserValue::Node(e);
                         }
                     };
                 // Param declaration is handled in [Rule::parameter]
@@ -122,7 +122,7 @@ impl TreeWalker {
                     };
                 };
                 if return_type != ReturnType::Void && !self.func_has_return {
-                    visitor.add_error(&SyntaxBuilderError(format!(
+                    visitor.handle_error(SyntaxBuilderError(format!(
                         "Function `{}` has no return, should return {}",
                         name.0, return_type
                     )));
@@ -226,7 +226,7 @@ impl TreeWalker {
                             self.current_decl_type.expect("No declaration type set"),
                         ) {
                             Ok(id) => ParserValue::Id(id),
-                            Err(e) => ParserValue::Node(e.into()),
+                            Err(e) => ParserValue::Node(e),
                         };
                     }
                 }

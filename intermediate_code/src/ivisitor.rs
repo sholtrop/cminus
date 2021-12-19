@@ -2,7 +2,10 @@ use crate::intermediate_code::IntermediateCode;
 use crate::ioperand::IOperand;
 use crate::ioperator::{IOperator, IOperatorType};
 use crate::istatement::IStatement;
-use syntax::{NodeType::*, ReturnType};
+use syntax::{
+    NodeType::{self, *},
+    ReturnType,
+};
 use syntax::{SymbolId, SyntaxNode};
 
 pub struct IVisitor<'a> {
@@ -85,9 +88,13 @@ impl<'a> IVisitor<'a> {
             }
             Add | Sub | Mul | Div | And | Or | RelEqual | RelNotEqual | RelGT | RelGTE | RelLT
             | RelLTE => {
-                let operator = IOperator::from(exp.node_type());
                 let (l, r) = exp.get_both_binary_children();
                 let common_ret = l.return_type();
+                let operator = if common_ret.is_unsigned() {
+                    IOperator::from(ntype).to_unsigned()
+                } else {
+                    IOperator::from(ntype)
+                };
                 assert!(
                     common_ret == r.return_type(),
                     "Return types were not the same - coercion violation"
@@ -128,7 +135,7 @@ impl<'a> IVisitor<'a> {
                 let (func, args) = exp.get_both_binary_children();
                 self.visit_func_call(func, args)
             }
-            RArray => self.visit_rarray_access(exp),
+            ArrayAccess => self.visit_array_access(exp),
             Num => {
                 let num = exp.get_number();
                 IOperand::Immediate {
@@ -222,8 +229,8 @@ impl<'a> IVisitor<'a> {
     fn visit_assignment(&mut self, l_var: &SyntaxNode, r_expr: &SyntaxNode) -> IOperand {
         log::trace!("Assignment: {} | {}", l_var, r_expr);
         let common_ret = l_var.return_type().to_base_type();
-        let ret_target = if l_var.return_type().is_array() {
-            self.visit_larray_access(l_var)
+        let ret_target = if l_var.node_type() == NodeType::ArrayAccess {
+            self.visit_array_access(l_var)
         } else {
             IOperand::Symbol {
                 id: l_var.symbol_id(),
@@ -360,47 +367,38 @@ impl<'a> IVisitor<'a> {
         });
     }
 
-    fn visit_larray_access(&mut self, node: &SyntaxNode) -> IOperand {
+    fn visit_array_access(&mut self, node: &SyntaxNode) -> IOperand {
         let (array, access) = node.get_both_binary_children();
-        log::trace!("LArray - array: {}, access: {}", array, access);
-        let array_id = array.symbol_id();
-        let ret_type = array.return_type().to_base_type();
-        let write_val = self
-            .icode
-            .get_statement(-2)
-            .ret_target
-            .as_ref()
-            .expect(
-                "Could not get return value of second-to-last statement as value to put into array",
-            )
-            .clone();
-        let access_with_offset = self.calc_array_index(ret_type, access);
-        let ret_target = IOperand::from_symbol(array_id, ret_type);
-        self.icode.append_statement(IStatement {
-            op_type: ret_type.into(),
-            operator: IOperator::Larray,
-            operand1: Some(write_val),
-            operand2: Some(access_with_offset),
-            ret_target: Some(ret_target.clone()),
-        });
-        ret_target
-    }
-
-    fn visit_rarray_access(&mut self, node: &SyntaxNode) -> IOperand {
-        let (array, access) = node.get_both_binary_children();
+        log::trace!("Array - array: {}, access: {}", array, access);
         let array_id = array.symbol_id();
         let ret_type = array.return_type().to_base_type();
         let access_with_offset = self.calc_array_index(ret_type, access);
         let array_access_retval = IOperand::from_symbol(self.make_temp(ret_type), ret_type);
         self.icode.append_statement(IStatement {
             op_type: ret_type.into(),
-            operator: IOperator::Rarray,
+            operator: IOperator::Array,
             operand1: Some(IOperand::from_symbol(array_id, ret_type)),
             operand2: Some(access_with_offset),
             ret_target: Some(array_access_retval.clone()),
         });
         array_access_retval
     }
+
+    // fn visit_rarray_access(&mut self, node: &SyntaxNode) -> IOperand {
+    //     let (array, access) = node.get_both_binary_children();
+    //     let array_id = array.symbol_id();
+    //     let ret_type = array.return_type().to_base_type();
+    //     let access_with_offset = self.calc_array_index(ret_type, access);
+    //     let array_access_retval = IOperand::from_symbol(self.make_temp(ret_type), ret_type);
+    //     self.icode.append_statement(IStatement {
+    //         op_type: ret_type.into(),
+    //         operator: IOperator::Rarray,
+    //         operand1: Some(IOperand::from_symbol(array_id, ret_type)),
+    //         operand2: Some(access_with_offset),
+    //         ret_target: Some(array_access_retval.clone()),
+    //     });
+    //     array_access_retval
+    // }
 
     fn calc_array_index(&mut self, base_type: ReturnType, access: &SyntaxNode) -> IOperand {
         let type_size: usize = IOperatorType::from(base_type).into();

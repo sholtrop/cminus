@@ -17,8 +17,7 @@ pub enum NodeType {
     If,
     IfTargets,
     While,
-    LArray,
-    RArray,
+    ArrayAccess,
     Return,
     FunctionCall,
     ExpressionList,
@@ -66,8 +65,7 @@ impl fmt::Display for NodeType {
                 NodeType::If => "if",
                 NodeType::IfTargets => "if_targets",
                 NodeType::While => "while",
-                NodeType::LArray => "l_array",
-                NodeType::RArray => "r_array",
+                NodeType::ArrayAccess => "array_access",
                 NodeType::Return => "return",
                 NodeType::FunctionCall => "function_call",
                 NodeType::ExpressionList => "expression_list",
@@ -123,7 +121,7 @@ impl NodeType {
                 | Self::Coercion
                 | Self::FunctionCall
                 | Self::Id
-                | Self::RArray
+                | Self::ArrayAccess
         )
     }
 }
@@ -248,21 +246,16 @@ impl SyntaxNode {
     /// Attempt to coerce [SyntaxNode] `from` to [ReturnType] `to`
     /// If the coercion is valid, will return a unary coercion [SyntaxNode] with the `from` node as its child.
     pub fn coerce(from: SyntaxNode, to: ReturnType) -> SyntaxResult {
+        log::trace!("Coerce from {} to {}", from, to);
         let from_ret_t = from.return_type();
         if from_ret_t == ReturnType::Void {
             return Err("Expression must have a return value".into());
         }
         if from_ret_t == to {
             Ok(from)
-        } else if to == ReturnType::Bool || to == ReturnType::Error {
-            Ok(SyntaxNode::Unary {
-                child: Some(Box::new(from)),
-                node_type: NodeType::Coercion,
-                return_type: to,
-            })
         }
         // ReturnTypes have a defined partial ordering for coercion
-        else if from_ret_t < to {
+        else if matches!(to, ReturnType::Bool | ReturnType::Error) || from_ret_t < to {
             Ok(SyntaxNode::Unary {
                 child: Some(Box::new(from)),
                 return_type: to,

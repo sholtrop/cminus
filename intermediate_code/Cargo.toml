@@ -1,5 +1,5 @@
 [package]
-name = "intermediate-code"
+name = "intermediate_code"
 version = "0.1.0"
 authors = ["Sjors Holtrop <sjors@sholtrop.dev>"]
 edition = "2018"
@@ -9,5 +9,6 @@ edition = "2018"
 [dependencies]
 general = { path = "../general" }
 syntax = { path = "../syntax" }
+lexical = { path = "../lexical" }
 clap = "2.33.3"
 log = "0.4.14"

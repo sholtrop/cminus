@@ -10,6 +10,7 @@ edition = "2018"
 general = { path = "../general" }
 lexical = { path = "../lexical" } 
 syntax  = { path = "../syntax" }
+intermediate_code = { path = "../intermediate_code" }
 log = "0.4.14"
 clap = "2.33.3"
 ptree = "0.4.0"

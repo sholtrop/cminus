@@ -3,8 +3,8 @@
 members = [
     "lexical",
     "syntax",
-    "intermediate-code",
-    "machine-code",
+    "intermediate_code",
+    "machine_code",
     "general",
     "tests"
 ]

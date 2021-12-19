@@ -135,7 +135,7 @@ impl Visitor {
         symbol_type: SymbolType,
         return_type: ReturnType,
         name: SymbolName,
-    ) -> Result<SymbolId, SyntaxBuilderError> {
+    ) -> Result<SymbolId, SyntaxNode> {
         let id = self
             .builder
             .enter_function(Symbol {
@@ -144,12 +144,9 @@ impl Visitor {
                 symbol_type,
                 line: self.current_line,
             })
-            .map_err(|e| {
-                self.add_error(&e);
-                e
-            })?;
+            .map_err(|e| self.handle_error(e));
         self.add_local_scope();
-        Ok(id)
+        id
     }
 
     pub fn visit_param_decl(&mut self, name: SymbolName, return_type: ReturnType) -> SymbolId {
@@ -161,7 +158,7 @@ impl Visitor {
                 line: self.current_line,
             })
             .unwrap_or_else(|err| {
-                self.add_error(&err);
+                self.handle_error(err);
                 SymbolId(SYMBOL_ID_ERROR)
             })
     }
@@ -178,7 +175,7 @@ impl Visitor {
                 line: self.current_line,
             })
             .unwrap_or_else(|err| {
-                self.add_error(&err);
+                self.handle_error(err);
                 SymbolId(SYMBOL_ID_ERROR)
             })
     }
@@ -211,8 +208,7 @@ impl Visitor {
             Some((f, s)) => (f, s),
             None => {
                 let err = SyntaxBuilderError(format!("Cannot find function with name `{}`", name));
-                self.add_error(&err);
-                return err.into();
+                return self.handle_error(err);
             }
         };
         // Leave me alone, mr. borrow checker
@@ -223,8 +219,7 @@ impl Visitor {
             let formal_args = match self.builder.get_parameters(&id) {
                 Ok(v) => v,
                 Err(e) => {
-                    self.add_error(&e);
-                    return e.into();
+                    return self.handle_error(e);
                 }
             };
             let formal_args = formal_args.into_iter();
@@ -237,16 +232,14 @@ impl Visitor {
                         "Too many arguments for function {}. Expected {}, got {}",
                         func.name, n_formal_args, n_actual_args
                     ));
-                    self.add_error(&err);
-                    return err.into();
+                    return self.handle_error(err);
                 }
                 Ordering::Less => {
                     let err = SyntaxBuilderError(format!(
                         "Too few arguments for function {}. Expected {}, got {}",
                         func.name, n_formal_args, n_actual_args
                     ));
-                    self.add_error(&err);
-                    return err.into();
+                    return self.handle_error(err);
                 }
                 _ => {}
             };
@@ -255,10 +248,7 @@ impl Visitor {
             for pair in actual_args.zip_longest(formal_args).rev() {
                 if let EitherOrBoth::Both(mut actual_arg, formal_arg) = pair {
                     actual_arg = SyntaxNode::coerce(actual_arg, formal_arg.return_type)
-                        .unwrap_or_else(|err| {
-                            self.add_error(&err);
-                            err.into()
-                        });
+                        .unwrap_or_else(|err| self.handle_error(err));
                     current_node = Some(SyntaxNode::Binary {
                         node_type: NodeType::ExpressionList,
                         return_type: ReturnType::Void,
@@ -269,8 +259,7 @@ impl Visitor {
             }
         } else {
             let err = SyntaxBuilderError(format!("Symbol `{}` is not a function", name));
-            self.add_error(&err);
-            return err.into();
+            return self.handle_error(err);
         };
         SyntaxNode::Binary {
             left: Some(Box::new(SyntaxNode::Symbol {
@@ -312,8 +301,7 @@ impl Visitor {
         } else {
             let err =
                 SyntaxBuilderError(format!("Could not convert {} to any number type", number));
-            self.add_error(&err);
-            return err.into();
+            return self.handle_error(err);
         };
         node
     }
@@ -345,13 +333,10 @@ impl Visitor {
                     "Void function `{}` can not return a value",
                     current_func.name
                 ));
-                self.add_error(&err);
-                return err.into();
+                return self.handle_error(err);
             }
-            ret_node = SyntaxNode::coerce(ret_node, current_ret).unwrap_or_else(|err| {
-                self.add_error(&err);
-                err.into()
-            });
+            ret_node = SyntaxNode::coerce(ret_node, current_ret)
+                .unwrap_or_else(|err| self.handle_error(err));
 
             SyntaxNode::Unary {
                 node_type: NodeType::Return,
@@ -370,10 +355,7 @@ impl Visitor {
     pub fn visit_while(&mut self, mut expression: SyntaxNode, statement: SyntaxNode) -> SyntaxNode {
         expression = match SyntaxNode::coerce(expression, ReturnType::Bool) {
             Ok(n) => n,
-            Err(err) => {
-                self.add_error(&err);
-                return err.into();
-            }
+            Err(err) => self.handle_error(err),
         };
         SyntaxNode::Binary {
             node_type: NodeType::While,
@@ -391,10 +373,7 @@ impl Visitor {
     ) -> SyntaxNode {
         condition = match SyntaxNode::coerce(condition, ReturnType::Bool) {
             Ok(n) => n,
-            Err(err) => {
-                self.add_error(&err);
-                return err.into();
-            }
+            Err(err) => self.handle_error(err),
         };
 
         let rchild = if let Some(else_body) = else_body {
@@ -416,15 +395,12 @@ impl Visitor {
     }
 
     pub fn visit_assignment(&mut self, lvar: SyntaxNode, mut exp: SyntaxNode) -> SyntaxNode {
-        let ret_type = lvar.return_type();
+        let ret_type = lvar.return_type().to_base_type();
         exp = match SyntaxNode::coerce(exp, ret_type) {
             Ok(n) => n,
-            Err(err) => {
-                self.add_error(&err);
-                return err.into();
-            }
+            Err(err) => self.handle_error(err),
         };
-
+        log::trace!("{}", exp);
         SyntaxNode::Binary {
             node_type: NodeType::Assignment,
             return_type: ret_type.to_base_type(),
@@ -443,11 +419,8 @@ impl Visitor {
         {
             if op_type == NodeType::Not {
                 *return_type = ReturnType::Bool;
-                let unary_child =
-                    SyntaxNode::coerce(unary_child, ReturnType::Bool).unwrap_or_else(|e| {
-                        self.add_error(&e);
-                        e.into()
-                    });
+                let unary_child = SyntaxNode::coerce(unary_child, ReturnType::Bool)
+                    .unwrap_or_else(|e| self.handle_error(e));
                 *child = Some(Box::new(unary_child))
             } else {
                 *return_type = unary_child.return_type();
@@ -476,17 +449,12 @@ impl Visitor {
                 common_ret_type = left_child.return_type();
             } else if left_child.return_type() < right_child.return_type() {
                 common_ret_type = right_child.return_type();
-                left_child = SyntaxNode::coerce(left_child, common_ret_type).unwrap_or_else(|e| {
-                    self.add_error(&e);
-                    e.into()
-                });
+                left_child = SyntaxNode::coerce(left_child, common_ret_type)
+                    .unwrap_or_else(|e| self.handle_error(e));
             } else {
                 common_ret_type = left_child.return_type();
-                right_child =
-                    SyntaxNode::coerce(right_child, common_ret_type).unwrap_or_else(|e| {
-                        self.add_error(&e);
-                        e.into()
-                    });
+                right_child = SyntaxNode::coerce(right_child, common_ret_type)
+                    .unwrap_or_else(|e| self.handle_error(e));
             }
 
             *return_type = match node_type {
@@ -498,7 +466,7 @@ impl Visitor {
             *left = Some(Box::new(left_child));
             *right = Some(Box::new(right_child));
         } else {
-            self.add_error(&SyntaxBuilderError(format!(
+            self.handle_error(SyntaxBuilderError(format!(
                 "Node {} is not a binary operator",
                 op
             )));
@@ -510,8 +478,7 @@ impl Visitor {
             Some((s, i)) => (s, i),
             None => {
                 let err = SyntaxBuilderError(format!("Error: Symbol `{}` is not defined", name));
-                self.add_error(&err);
-                return err.into();
+                return self.handle_error(err);
             }
         };
         SyntaxNode::Symbol {
@@ -526,8 +493,7 @@ impl Visitor {
             Some((s, i)) => (s, i),
             None => {
                 let err = SyntaxBuilderError(format!("Symbol `{}` is not defined", name));
-                self.add_error(&err);
-                return err.into();
+                return self.handle_error(err);
             }
         };
 
@@ -540,8 +506,8 @@ impl Visitor {
             symbol_id: id,
         };
         SyntaxNode::Binary {
-            node_type: NodeType::LArray,
-            return_type: symbol.return_type,
+            node_type: NodeType::ArrayAccess,
+            return_type: symbol.return_type.to_base_type(),
             left: Some(Box::new(id_node)),
             right: Some(Box::new(expr)),
         }
@@ -552,28 +518,31 @@ impl Visitor {
         name: SymbolName,
         arr_size: SyntaxNode,
         base_type: ReturnType,
-    ) -> Result<SymbolId, SyntaxBuilderError> {
+    ) -> Result<SymbolId, SyntaxNode> {
         let size = match arr_size {
             SyntaxNode::Constant { value, .. } => {
                 let value = i64::from(value);
                 if value < 1 {
-                    return Err("Array size must be greater than 0".into());
+                    Err(self.handle_error(SyntaxBuilderError::from(
+                        "Array size must be greater than 0",
+                    )))
+                } else {
+                    Ok(value as usize)
                 }
-                value as usize
             }
-            _ => return Err("`size` was not a Constant number SyntaxNode".into()),
-        };
+            _ => Err(self.handle_error(SyntaxBuilderError::from(
+                "`size` was not a Constant number SyntaxNode",
+            ))),
+        }?;
         let arr_symbol = Symbol {
             line: self.current_line,
             name,
             return_type: base_type.to_array_type(),
             symbol_type: SymbolType::ArrayVariable { size },
         };
-        let id = self.builder.add_symbol(arr_symbol).map_err(|err| {
-            self.add_error(&err);
-            err
-        })?;
-        Ok(id)
+        self.builder
+            .add_symbol(arr_symbol)
+            .map_err(|err| self.handle_error(err))
     }
 
     pub fn visit_array_param_decl(&mut self, name: SymbolName, base_type: ReturnType) -> SymbolId {
@@ -584,13 +553,15 @@ impl Visitor {
             symbol_type: SymbolType::ArrayParam,
         };
         self.builder.add_symbol(arr_symbol).unwrap_or_else(|err| {
-            self.add_error(&err);
+            self.handle_error(err);
             SymbolId(SYMBOL_ID_ERROR)
         })
     }
 
-    pub fn add_error(&mut self, err: &SyntaxBuilderError) {
-        self.errors.push((err.clone(), self.current_line))
+    /// Returns the given `err` as a [SyntaxNode]
+    pub fn handle_error(&mut self, err: SyntaxBuilderError) -> SyntaxNode {
+        self.errors.push((err.clone(), self.current_line));
+        err.into()
     }
 
     pub fn add_warning(&mut self, warning: &SyntaxBuilderWarning) {

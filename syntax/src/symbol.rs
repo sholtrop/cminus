@@ -110,11 +110,8 @@ impl ReturnType {
         }
     }
 
-    pub fn is_array(&self) -> bool {
-        matches!(
-            self,
-            Self::IntArray | Self::Int8Array | Self::UintArray | Self::Uint8Array
-        )
+    pub fn is_unsigned(&self) -> bool {
+        matches!(self, Self::Uint | Self::Uint8)
     }
 }
 
