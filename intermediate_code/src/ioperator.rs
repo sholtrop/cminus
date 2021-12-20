@@ -181,7 +181,10 @@ impl From<NodeType> for IOperator {
             NodeType::RelGTE => Self::SetGE,
             NodeType::RelLT => Self::SetL,
             NodeType::RelLTE => Self::SetLE,
+            NodeType::Or => Self::Or,
+            NodeType::And => Self::And,
             NodeType::Unknown => Self::Unknown,
+            NodeType::Mod => Self::Mod,
             _ => unreachable!("Cannot convert {} to IOperator", node_type),
         }
     }
@@ -194,7 +197,7 @@ impl IOperator {
             Self::SetGE => Self::SetAE,
             Self::SetL => Self::SetB,
             Self::SetLE => Self::SetBE,
-            _ => unreachable!("Cannot convert {} to unsigned variant", self),
+            _ => self,
         }
     }
 }

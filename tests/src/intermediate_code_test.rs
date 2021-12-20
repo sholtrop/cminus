@@ -33,9 +33,5 @@ pub fn run() -> io::Result<()> {
         }
     }
     log::info!("[{} / {}] TESTS PASSED", stats.success, stats.total);
-    stats.success = 0;
-    stats.total = 0;
-    println!();
-    log::info!("Running specific tests...");
     Ok(())
 }

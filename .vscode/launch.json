@@ -108,34 +108,34 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug executable 'intermediate-code'",
+      "name": "Debug executable 'intermediate_code'",
       "cargo": {
         "args": [
           "build",
-          "--bin=intermediate-code",
-          "--package=intermediate-code"
+          "--bin=intermediate_code",
+          "--package=intermediate_code"
         ],
         "filter": {
-          "name": "intermediate-code",
+          "name": "intermediate_code",
           "kind": "bin"
         }
       },
       "args": ["test.c"],
-      "cwd": "${workspaceFolder}/intermediate-code"
+      "cwd": "${workspaceFolder}/intermediate_code"
     },
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug unit tests in executable 'intermediate-code'",
+      "name": "Debug unit tests in executable 'intermediate_code'",
       "cargo": {
         "args": [
           "test",
           "--no-run",
-          "--bin=intermediate-code",
-          "--package=intermediate-code"
+          "--bin=intermediate_code",
+          "--package=intermediate_code"
         ],
         "filter": {
-          "name": "intermediate-code",
+          "name": "intermediate_code",
           "kind": "bin"
         }
       },

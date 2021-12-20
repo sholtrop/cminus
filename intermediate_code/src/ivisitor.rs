@@ -86,8 +86,8 @@ impl<'a> IVisitor<'a> {
                 let (l, r) = exp.get_both_binary_children();
                 self.visit_assignment(l, r)
             }
-            Add | Sub | Mul | Div | And | Or | RelEqual | RelNotEqual | RelGT | RelGTE | RelLT
-            | RelLTE => {
+            Add | Sub | Mul | Div | Mod | And | Or | RelEqual | RelNotEqual | RelGT | RelGTE
+            | RelLT | RelLTE => {
                 let (l, r) = exp.get_both_binary_children();
                 let common_ret = l.return_type();
                 let operator = if common_ret.is_unsigned() {
@@ -132,7 +132,8 @@ impl<'a> IVisitor<'a> {
                 postcoercion
             }
             FunctionCall => {
-                let (func, args) = exp.get_both_binary_children();
+                let (func, args) = exp.get_binary_children();
+                let func = func.unwrap();
                 self.visit_func_call(func, args)
             }
             ArrayAccess => self.visit_array_access(exp),
@@ -316,7 +317,7 @@ impl<'a> IVisitor<'a> {
             .append_statement(IStatement::make_label(end_loop));
     }
 
-    fn visit_func_call(&mut self, func: &SyntaxNode, args: &SyntaxNode) -> IOperand {
+    fn visit_func_call(&mut self, func: &SyntaxNode, args: Option<&SyntaxNode>) -> IOperand {
         let func_id = func.symbol_id();
         let ret_type = self.table.get_symbol(&func_id).unwrap().return_type;
         let ret_temp = self.make_temp(ret_type);
@@ -324,8 +325,9 @@ impl<'a> IVisitor<'a> {
             id: ret_temp,
             ret_type,
         };
-
-        self.visit_expr_list(args);
+        if let Some(args) = args {
+            self.visit_expr_list(args);
+        }
         self.icode.append_statement(IStatement {
             op_type: ret_type.into(),
             operator: IOperator::FuncCall,
