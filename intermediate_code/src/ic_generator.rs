@@ -1,13 +1,20 @@
 use crate::{
     error::ICodeError, flow_graph::FlowGraph, intermediate_code::IntermediateCode,
-    ivisitor::IVisitor, OptLevel,
+    ivisitor::IVisitor,
 };
 use std::fmt;
 use syntax::{SymbolTable, SyntaxTree};
 
+pub enum OptLevel {
+    None,
+    Pre,
+    Post,
+    Both,
+}
+
 pub struct Intermediate {
-    icode: IntermediateCode,
-    graph: FlowGraph,
+    pub icode: IntermediateCode,
+    pub graph: FlowGraph,
 }
 
 fn preprocess(tree: &SyntaxTree, table: &mut SymbolTable) {}

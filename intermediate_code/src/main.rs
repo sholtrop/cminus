@@ -1,6 +1,7 @@
 pub mod error;
 pub mod flow_graph;
 pub mod ic_generator;
+pub mod ic_info;
 pub mod id;
 pub mod intermediate_code;
 pub mod ioperand;
@@ -9,7 +10,7 @@ pub mod istatement;
 pub mod ivisitor;
 
 use crate::error::ICodeError;
-use ::intermediate_code::OptLevel;
+use crate::ic_generator::{Intermediate, OptLevel};
 use clap::clap_app;
 use general::logging::init_logger_from_env;
 use syntax::SyntaxAnalysisResult;
@@ -19,16 +20,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         (version: "1.0")
         (about: "Produce intermediate code for the given input C-minus file")
         (@arg annotate: -a --annotate "Also print the annotated intermediate code")
+        (@arg flowgraph: -g --flowgraph "Save the control flow graph in .dot format to the provided file")
         (@arg INPUT: +required "Sets the input")
     )
     .get_matches();
-    // let level = if matches.is_present("verbose") {
-    //     LevelFilter::Trace
-    // } else {
-    //     LevelFilter::Info
-    // };
     init_logger_from_env();
     let annotate = matches.is_present("annotate");
+    let graph_filename = matches.value_of("flowgraph");
     let input = matches.value_of("INPUT").unwrap();
     let input = std::fs::read_to_string(input)?;
     let SyntaxAnalysisResult {
@@ -51,13 +49,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("\n{}", symbol_table);
     log::info!("\n{}", tree);
     match ic {
-        Ok(ic) => {
-            log::info!("\n{}", ic);
+        Ok(Intermediate { ref graph, icode }) => {
+            log::info!("\n{}", icode);
             if annotate {
                 log::info!(
                     "\nAnnotated:\n{}",
-                    symbol_table.annotate_icode(ic.to_string())
+                    symbol_table.annotate_icode(icode.to_string())
                 );
+            }
+            if let Some(filename) = graph_filename {
+                let mut file = std::fs::File::create(filename).unwrap();
+                dot::render(&graph, &mut file).unwrap();
             }
             Ok(())
         }

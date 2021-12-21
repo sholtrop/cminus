@@ -1,3 +1,4 @@
+use intermediate_code::ic_generator::OptLevel;
 use std::io;
 use tests::{collect_tests_in_path, run_single_test, Expectation, TestStats};
 
@@ -6,7 +7,7 @@ const UNIT_TEST_PATH: &str = "tests/testfiles/general/units";
 const SYNTAX_TEST_PATH: &str = "tests/testfiles/syntax";
 
 pub fn test_function(input: &str) -> Result<(), &str> {
-    intermediate_code::generate_from_str(input, intermediate_code::OptLevel::None)
+    intermediate_code::generate_from_str(input, OptLevel::None)
         .or(Err("error"))
         .and(Ok(()))
 }

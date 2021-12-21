@@ -7,8 +7,7 @@ use crate::syntax_tree::SyntaxTree;
 use crate::{
     builder::SyntaxBuilder,
     error::SyntaxBuilderError,
-    id::BUILTIN_IDS,
-    id::{SymbolId, SymbolName},
+    id::{Linenumber, SymbolId, SymbolName, BUILTIN_IDS},
     node::SyntaxNode,
     symbol::{ReturnType, Symbol, SymbolType},
     symbol_table::{SymbolTable, SYMBOL_ID_ERROR},
@@ -17,19 +16,18 @@ use crate::{
 pub struct SyntaxAnalysisResult {
     pub tree: SyntaxTree,
     pub symbol_table: SymbolTable,
-    pub errors: Vec<ErrorWithLineno>,
-    pub warnings: Vec<WarningWithLineno>,
+    pub errors: Vec<ErrorWithLinenumber>,
+    pub warnings: Vec<WarningWithLinenumber>,
 }
 
-type ErrorWithLineno = (SyntaxBuilderError, usize);
-type WarningWithLineno = (SyntaxBuilderWarning, usize);
+type ErrorWithLinenumber = (SyntaxBuilderError, Linenumber);
+type WarningWithLinenumber = (SyntaxBuilderWarning, Linenumber);
 
-#[derive(Default)]
 pub struct Visitor {
     builder: SyntaxBuilder,
-    errors: Vec<ErrorWithLineno>,
-    warnings: Vec<WarningWithLineno>,
-    current_line: usize,
+    errors: Vec<ErrorWithLinenumber>,
+    warnings: Vec<WarningWithLinenumber>,
+    current_line: Linenumber,
 }
 
 pub type SyntaxResult = Result<SyntaxNode, SyntaxBuilderError>;
@@ -566,5 +564,11 @@ impl Visitor {
 
     pub fn add_warning(&mut self, warning: &SyntaxBuilderWarning) {
         self.warnings.push((warning.clone(), self.current_line))
+    }
+}
+
+impl Default for Visitor {
+    fn default() -> Self {
+        Self::new()
     }
 }

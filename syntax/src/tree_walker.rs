@@ -33,7 +33,6 @@ impl From<SyntaxBuilderError> for ParserValue {
 
 #[derive(Default)]
 pub struct TreeWalker {
-    // current_line: usize,
     current_decl_type: Option<ReturnType>,
     is_func_body: bool,
     func_has_return: bool,
@@ -42,7 +41,6 @@ pub struct TreeWalker {
 impl TreeWalker {
     pub fn new() -> Self {
         Self {
-            // current_line: 1,
             current_decl_type: None,
             is_func_body: false,
             func_has_return: false,

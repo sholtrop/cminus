@@ -29,3 +29,5 @@ impl std::fmt::Display for SymbolName {
         write!(f, "{}", self.0)
     }
 }
+
+pub type Linenumber = usize;

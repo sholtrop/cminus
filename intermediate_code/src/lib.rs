@@ -1,23 +1,18 @@
 use error::ICodeError;
 use ic_generator::Intermediate;
+use ic_generator::OptLevel;
 use syntax::{SymbolTable, SyntaxAnalysisResult, SyntaxTree};
 
 pub mod error;
 pub mod flow_graph;
 pub mod ic_generator;
+pub mod ic_info;
 pub mod id;
 pub mod intermediate_code;
 pub mod ioperand;
 pub mod ioperator;
 pub mod istatement;
 pub mod ivisitor;
-
-pub enum OptLevel {
-    None,
-    Pre,
-    Post,
-    Both,
-}
 
 pub fn generate(
     tree: &SyntaxTree,
