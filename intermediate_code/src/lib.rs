@@ -7,7 +7,6 @@ pub mod error;
 pub mod flow_graph;
 pub mod ic_generator;
 pub mod ic_info;
-pub mod id;
 pub mod intermediate_code;
 pub mod ioperand;
 pub mod ioperator;

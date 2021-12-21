@@ -2,7 +2,6 @@ pub mod error;
 pub mod flow_graph;
 pub mod ic_generator;
 pub mod ic_info;
-pub mod id;
 pub mod intermediate_code;
 pub mod ioperand;
 pub mod ioperator;
@@ -13,6 +12,8 @@ use crate::error::ICodeError;
 use crate::ic_generator::{Intermediate, OptLevel};
 use clap::clap_app;
 use general::logging::init_logger_from_env;
+use std::io::Write;
+use std::process::{Command, Stdio};
 use syntax::SyntaxAnalysisResult;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         (version: "1.0")
         (about: "Produce intermediate code for the given input C-minus file")
         (@arg annotate: -a --annotate "Also print the annotated intermediate code")
-        (@arg flowgraph: -g --flowgraph "Save the control flow graph in .dot format to the provided file")
+        (@arg flowgraph: +takes_value -g --flowgraph  "Save the control flow graph in .png format to the provided file. Requires the Graphviz library (`dot`).")
         (@arg INPUT: +required "Sets the input")
     )
     .get_matches();
@@ -58,11 +59,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
             if let Some(filename) = graph_filename {
-                let mut file = std::fs::File::create(filename).unwrap();
-                dot::render(&graph, &mut file).unwrap();
+                let mut dot = Command::new("dot")
+                    .arg("-Tpng")
+                    .arg("-o")
+                    .arg(filename)
+                    .stdin(Stdio::piped())
+                    .spawn()
+                    .unwrap_or_else(|e| {
+                        panic!(
+                            "Could not create {}. Is graphviz installed on your system?\n{}",
+                            filename, e
+                        )
+                    });
+                dot.stdin
+                    .as_mut()
+                    .unwrap()
+                    .write_all(graph.to_string().as_bytes())
+                    .unwrap();
+                log::info!("Saved control flow graph to {}", filename);
             }
             Ok(())
         }
+
         Err(e) => Err(Box::new(e)),
     }
 }

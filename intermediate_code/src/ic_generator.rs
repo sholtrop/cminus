@@ -40,10 +40,8 @@ pub fn generate(
         OptLevel::Post | OptLevel::Both => postprocess(&mut icode, table),
         _ => {}
     };
-    Ok(Intermediate {
-        icode,
-        graph: FlowGraph::new(),
-    })
+    let graph = FlowGraph::new(table, &icode);
+    Ok(Intermediate { icode, graph })
 }
 
 fn postprocess(icode: &mut IntermediateCode, table: &mut SymbolTable) {}
