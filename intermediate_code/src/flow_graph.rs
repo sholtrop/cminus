@@ -3,6 +3,7 @@ use crate::{
     intermediate_code::IntermediateCode,
 };
 use id_arena::Arena;
+use itertools::Itertools;
 use std::{borrow::Cow, fmt};
 use syntax::SymbolTable;
 
@@ -10,7 +11,8 @@ use syntax::SymbolTable;
 pub struct BasicBlock {
     start: ICLineNumber,
     end: ICLineNumber,
-    others: Vec<id_arena::Id<BasicBlock>>,
+    incoming: Vec<id_arena::Id<BasicBlock>>,
+    outgoing: Vec<id_arena::Id<BasicBlock>>,
 }
 
 impl BasicBlock {
@@ -18,22 +20,33 @@ impl BasicBlock {
         Self {
             start,
             end,
-            others: vec![],
+            incoming: vec![],
+            outgoing: vec![],
         }
     }
 
     pub fn new_with(
         start: ICLineNumber,
         end: ICLineNumber,
-        others: Vec<id_arena::Id<BasicBlock>>,
+        incoming: Vec<id_arena::Id<BasicBlock>>,
+        outgoing: Vec<id_arena::Id<BasicBlock>>,
     ) -> Self {
-        Self { start, end, others }
+        Self {
+            start,
+            end,
+            incoming,
+            outgoing,
+        }
     }
 }
 
 impl fmt::Display for BasicBlock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "s{}_e{}", self.start, self.end)
+        if self.start != self.end {
+            write!(f, "B{}_{}", self.start, self.end)
+        } else {
+            write!(f, "B{}", self.start)
+        }
     }
 }
 
@@ -46,7 +59,30 @@ impl FlowGraph {
     pub fn new(table: &SymbolTable, icode: &IntermediateCode) -> Self {
         let mut graph = Arena::new();
         let info = FlowGraph::icode_to_info(icode);
-        Self { graph, entry: None }
+        let mut iter = info.leaders.iter();
+        let mut entry = None;
+        let mut prev_block = None;
+        let mut prev_line: Option<&ICLineNumber> = None;
+        log::trace!("before loop");
+        for curr_line in iter {
+            if let Some(prev_line) = prev_line {
+                log::trace!("{} {}", prev_line, curr_line);
+                let id = graph.alloc(BasicBlock::new(*prev_line, *curr_line - 1));
+                prev_block = Some(id);
+                if let Some(sym) = info.funcs.get(curr_line) {
+                    if table.get_main_id() == *sym {
+                        entry = Some(id);
+                    }
+                    log::trace!("is func {}", sym);
+                }
+            }
+            prev_line = Some(curr_line);
+        }
+        graph.alloc(BasicBlock::new(
+            *prev_line.unwrap(),
+            icode.n_statements().into(),
+        ));
+        Self { graph, entry }
     }
 
     fn icode_to_info(icode: &IntermediateCode) -> ICInfo {
@@ -99,7 +135,7 @@ impl<'a> dot::GraphWalk<'a, Vertex<'a>, Edge> for &FlowGraph {
     fn edges(&'a self) -> dot::Edges<'a, Edge> {
         let mut v = Vec::<Edge>::with_capacity(self.graph.len());
         for (id, node) in self.graph.iter() {
-            for neighbor in node.others.clone() {
+            for neighbor in node.incoming.clone() {
                 v.push((id, neighbor));
             }
         }

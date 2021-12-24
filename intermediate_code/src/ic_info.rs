@@ -1,11 +1,11 @@
 use std::{
-    collections::{HashMap, HashSet},
-    ops::Add,
+    collections::{BTreeSet, HashMap},
+    ops::{Add, Sub},
 };
 use syntax::SymbolId;
 #[derive(Default, Debug)]
 pub struct ICInfo {
-    pub leaders: HashSet<ICLineNumber>,
+    pub leaders: BTreeSet<ICLineNumber>,
     pub labels: HashMap<SymbolId, ICLineNumber>,
     pub calls: HashMap<SymbolId, Vec<ICLineNumber>>,
     pub funcs: HashMap<ICLineNumber, SymbolId>,
@@ -14,7 +14,7 @@ pub struct ICInfo {
 impl ICInfo {
     pub fn new() -> Self {
         Self {
-            leaders: HashSet::new(),
+            leaders: BTreeSet::new(),
             labels: HashMap::new(),
             calls: HashMap::new(),
             funcs: HashMap::new(),
@@ -30,7 +30,7 @@ impl ICInfo {
 
 use std::fmt;
 
-#[derive(Clone, PartialEq, Eq, Hash, Copy, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Copy, Debug, PartialOrd, Ord)]
 pub struct ICLineNumber(pub usize);
 
 impl fmt::Display for ICLineNumber {
@@ -49,5 +49,12 @@ impl Add<usize> for ICLineNumber {
     type Output = Self;
     fn add(self, rhs: usize) -> Self::Output {
         Self(self.0 + rhs)
+    }
+}
+
+impl Sub<usize> for ICLineNumber {
+    type Output = Self;
+    fn sub(self, rhs: usize) -> Self::Output {
+        Self(self.0 - rhs)
     }
 }

@@ -1,17 +1,8 @@
-void hello(int a)
-{
-    if (a == 0)
-        return;
-    writeinteger(a);
-}
 
 int main(void)
 {
-    int x = 2;
-    while (x > 0)
-    {
-        x = x - 1;
-    }
-    hello(x);
-    return 0;
+    if (0)
+        return 0;
+    else
+        return 1;
 }
