@@ -28,12 +28,13 @@ pub struct FunctionInfo {
 }
 
 pub const SYMBOL_ID_ERROR: usize = 0;
-
+pub const MAIN_FN: &str = "main";
 #[derive(Default, Clone)]
 pub struct SymbolTable {
     symbols: HashMap<SymbolId, SymbolInfo>,
     functions: HashMap<SymbolId, FunctionInfo>,
     id_count: usize,
+    main: Option<SymbolId>,
 }
 
 impl fmt::Display for SymbolTable {
@@ -94,6 +95,7 @@ impl SymbolTable {
             symbols: HashMap::new(),
             functions: HashMap::new(),
             id_count: SYMBOL_ID_ERROR + 1,
+            main: None,
         }
     }
 
@@ -147,6 +149,7 @@ impl SymbolTable {
     }
 
     pub fn add_function(&mut self, function: Symbol) -> SymbolId {
+        let is_main = function.name.0 == MAIN_FN;
         let id = self.add_symbol(function, SymbolScope::Global);
         self.functions.insert(
             id,
@@ -155,7 +158,9 @@ impl SymbolTable {
                 variables: vec![],
             },
         );
-
+        if is_main {
+            self.main = Some(id);
+        }
         id
     }
 
@@ -216,6 +221,10 @@ impl SymbolTable {
                 owning_function: func_id,
             },
         )
+    }
+
+    pub fn get_main_id(&self) -> SymbolId {
+        self.main.expect("Error: `main` function is undefined")
     }
 
     pub fn annotate_icode(&self, icode: String) -> String {

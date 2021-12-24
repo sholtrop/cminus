@@ -50,7 +50,7 @@ impl<'a> IVisitor<'a> {
                 let (cond, targets) = node.get_both_binary_children();
 
                 // if without else
-                let (if_body, else_body) = if targets.node_type() == StatementList {
+                let (if_body, else_body) = if targets.node_type() != IfTargets {
                     (targets, None)
                 }
                 // if with else
@@ -385,22 +385,6 @@ impl<'a> IVisitor<'a> {
         });
         array_access_retval
     }
-
-    // fn visit_rarray_access(&mut self, node: &SyntaxNode) -> IOperand {
-    //     let (array, access) = node.get_both_binary_children();
-    //     let array_id = array.symbol_id();
-    //     let ret_type = array.return_type().to_base_type();
-    //     let access_with_offset = self.calc_array_index(ret_type, access);
-    //     let array_access_retval = IOperand::from_symbol(self.make_temp(ret_type), ret_type);
-    //     self.icode.append_statement(IStatement {
-    //         op_type: ret_type.into(),
-    //         operator: IOperator::Rarray,
-    //         operand1: Some(IOperand::from_symbol(array_id, ret_type)),
-    //         operand2: Some(access_with_offset),
-    //         ret_target: Some(array_access_retval.clone()),
-    //     });
-    //     array_access_retval
-    // }
 
     fn calc_array_index(&mut self, base_type: ReturnType, access: &SyntaxNode) -> IOperand {
         let type_size: usize = IOperatorType::from(base_type).into();

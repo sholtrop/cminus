@@ -72,8 +72,8 @@ pub enum IOperator {
     Je,  // ==
     Jne, // !=
     Jb,  // < unsigned
-    JL,  // < signed
-    Jnb, // >= unsigned
+    Jl,  // < signed
+    Jae, // >= unsigned
     Jge, // >= signed
     Jbe, // <= unsigned
     Jle, // <= signed
@@ -131,8 +131,8 @@ impl fmt::Display for IOperator {
                 Self::Je => "JUMP_EQUAL",
                 Self::Jne => "JUMP_NOT_EQUAL",
                 Self::Jb => "JUMP_BELOW",
-                Self::JL => "JUMP_LESS",
-                Self::Jnb => "JUMP_NOT_BELOW",
+                Self::Jl => "JUMP_LESS",
+                Self::Jae => "JUMP_NOT_BELOW",
                 Self::Jge => "JUMP_GREATER_EQUAL",
                 Self::Jbe => "JUMP_BELOW_EQUAL",
                 Self::Jle => "JUMP_LESS_EQUAL",

@@ -1,4 +1,7 @@
-use crate::{ic_info::ICLineNumber, intermediate_code::IntermediateCode};
+use crate::{
+    ic_info::{ICInfo, ICLineNumber},
+    intermediate_code::IntermediateCode,
+};
 use id_arena::Arena;
 use std::{borrow::Cow, fmt};
 use syntax::SymbolTable;
@@ -42,12 +45,34 @@ pub struct FlowGraph {
 impl FlowGraph {
     pub fn new(table: &SymbolTable, icode: &IntermediateCode) -> Self {
         let mut graph = Arena::new();
-        let entry = graph.alloc(BasicBlock::new(0.into(), 1.into()));
-        graph.alloc(BasicBlock::new_with(2.into(), 4.into(), vec![entry]));
-        Self {
-            graph,
-            entry: Some(entry),
+        let info = FlowGraph::icode_to_info(icode);
+        Self { graph, entry: None }
+    }
+
+    fn icode_to_info(icode: &IntermediateCode) -> ICInfo {
+        let mut info = ICInfo::new();
+        let mut statements = icode.into_iter().peekable();
+        while let Some((line, stmt)) = statements.next() {
+            if stmt.is_label() {
+                info.leaders.insert(line);
+                let id = stmt.label_id();
+                info.labels.insert(id, line);
+            } else if stmt.is_func() {
+                info.leaders.insert(line);
+                let id = stmt.label_id();
+                info.funcs.insert(line, id);
+            } else if stmt.is_jump() && statements.peek().is_some() {
+                info.leaders.insert(line + 1);
+            } else if stmt.is_call() {
+                let id = stmt.label_id();
+                info.add_call(id, line);
+                if statements.peek().is_some() {
+                    info.leaders.insert(line + 1);
+                }
+            }
         }
+        log::trace!("Info:\n{:#?}", info);
+        info
     }
 }
 
@@ -61,7 +86,7 @@ impl<'a> dot::Labeller<'a, Vertex<'a>, Edge> for &FlowGraph {
 
     fn node_id(&'a self, n: &Vertex) -> dot::Id {
         let (_, node) = n;
-        dot::Id::new(format!("{}", node)).unwrap()
+        dot::Id::new(node.to_string()).unwrap()
     }
 }
 

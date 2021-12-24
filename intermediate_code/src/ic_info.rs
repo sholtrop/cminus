@@ -1,14 +1,25 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Add,
+};
 use syntax::SymbolId;
-
+#[derive(Default, Debug)]
 pub struct ICInfo {
-    leaders: Vec<SymbolId>,
-    labels: HashMap<SymbolId, ICLineNumber>,
-    calls: HashMap<SymbolId, Vec<ICLineNumber>>,
-    funcs: HashMap<ICLineNumber, SymbolId>,
+    pub leaders: HashSet<ICLineNumber>,
+    pub labels: HashMap<SymbolId, ICLineNumber>,
+    pub calls: HashMap<SymbolId, Vec<ICLineNumber>>,
+    pub funcs: HashMap<ICLineNumber, SymbolId>,
 }
 
 impl ICInfo {
+    pub fn new() -> Self {
+        Self {
+            leaders: HashSet::new(),
+            labels: HashMap::new(),
+            calls: HashMap::new(),
+            funcs: HashMap::new(),
+        }
+    }
     pub fn add_call(&mut self, id: SymbolId, line: ICLineNumber) {
         self.calls
             .entry(id)
@@ -31,5 +42,12 @@ impl fmt::Display for ICLineNumber {
 impl From<usize> for ICLineNumber {
     fn from(line: usize) -> Self {
         Self(line)
+    }
+}
+
+impl Add<usize> for ICLineNumber {
+    type Output = Self;
+    fn add(self, rhs: usize) -> Self::Output {
+        Self(self.0 + rhs)
     }
 }

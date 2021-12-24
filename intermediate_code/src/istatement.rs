@@ -40,6 +40,42 @@ impl IStatement {
             ret_target: None,
         }
     }
+
+    pub fn is_label(&self) -> bool {
+        self.operator == IOperator::Label
+    }
+
+    pub fn is_func(&self) -> bool {
+        self.operator == IOperator::Func
+    }
+
+    pub fn is_jump(&self) -> bool {
+        matches!(
+            self.operator,
+            IOperator::Goto
+                | IOperator::Jl
+                | IOperator::Ja
+                | IOperator::Jae
+                | IOperator::Jb
+                | IOperator::Jbe
+                | IOperator::Jg
+                | IOperator::Jge
+                | IOperator::Jle
+                | IOperator::Jne
+                | IOperator::Je
+                | IOperator::Jz
+                | IOperator::Jnz
+                | IOperator::Return
+        )
+    }
+
+    pub fn is_call(&self) -> bool {
+        self.operator == IOperator::FuncCall
+    }
+
+    pub fn label_id(&self) -> SymbolId {
+        self.operand1.as_ref().unwrap().id()
+    }
 }
 
 impl fmt::Display for IStatement {

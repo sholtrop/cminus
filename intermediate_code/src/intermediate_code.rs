@@ -1,4 +1,4 @@
-use crate::istatement::IStatement;
+use crate::{ic_info::ICLineNumber, istatement::IStatement};
 use std::fmt;
 
 #[derive(Default)]
@@ -42,5 +42,37 @@ impl fmt::Display for IntermediateCode {
             writeln!(f, "{}", statement)?;
         }
         Ok(())
+    }
+}
+
+impl<'a> IntoIterator for &'a IntermediateCode {
+    type Item = <ICodeIterator<'a> as Iterator>::Item;
+    type IntoIter = ICodeIterator<'a>;
+    fn into_iter(self) -> Self::IntoIter {
+        ICodeIterator {
+            icode: self,
+            index: 0,
+        }
+    }
+}
+
+pub struct ICodeIterator<'a> {
+    icode: &'a IntermediateCode,
+    index: usize,
+}
+
+impl<'a> Iterator for ICodeIterator<'a> {
+    type Item = (ICLineNumber, &'a IStatement);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index == self.icode.n_statements() {
+            None
+        } else {
+            self.index += 1;
+            Some((
+                ICLineNumber(self.index),
+                self.icode.get_statement((self.index - 1) as i32),
+            ))
+        }
     }
 }
