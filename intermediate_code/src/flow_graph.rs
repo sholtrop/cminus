@@ -12,6 +12,7 @@ pub struct BasicBlock {
     end: ICLineNumber,
     incoming: Vec<id_arena::Id<BasicBlock>>,
     outgoing: Vec<id_arena::Id<BasicBlock>>,
+    is_entry: bool,
 }
 
 impl BasicBlock {
@@ -21,6 +22,7 @@ impl BasicBlock {
             end,
             incoming: vec![],
             outgoing: vec![],
+            is_entry: false,
         }
     }
 
@@ -35,6 +37,7 @@ impl BasicBlock {
             end,
             incoming,
             outgoing,
+            is_entry: false,
         }
     }
 }
@@ -56,8 +59,9 @@ pub struct FlowGraph {
 
 impl FlowGraph {
     pub fn new(table: &SymbolTable, icode: &IntermediateCode) -> Self {
+        let main_id = table.get_main_id();
         let mut graph = Arena::new();
-        let info = FlowGraph::icode_to_info(icode);
+        let info = ICInfo::from(icode);
         let mut iter = info.leaders.iter();
         let mut entry = None;
         let mut prev_leader = iter.next().unwrap();
@@ -65,6 +69,14 @@ impl FlowGraph {
         for curr_leader in iter {
             let id = graph.alloc(BasicBlock::new(*prev_leader, *curr_leader - 1));
             leader_to_block.insert(*prev_leader, id);
+            if let Some(sym_id) = info.funcs.get(prev_leader) {
+                if *sym_id == main_id {
+                    let entry_block_id = *leader_to_block.get(prev_leader).unwrap();
+                    entry = Some(*leader_to_block.get(prev_leader).unwrap());
+                    let entry_block = graph.get_mut(entry_block_id).unwrap();
+                    entry_block.is_entry = true;
+                }
+            }
             prev_leader = curr_leader;
         }
         {
@@ -74,7 +86,6 @@ impl FlowGraph {
             ));
             leader_to_block.insert(*prev_leader, last);
         }
-
         for block_id in leader_to_block.values() {
             let out;
             {
@@ -92,33 +103,13 @@ impl FlowGraph {
         Self { graph, entry }
     }
 
-    fn icode_to_info(icode: &IntermediateCode) -> ICInfo {
-        let mut info = ICInfo::new();
-        let mut statements = icode.into_iter().peekable();
-        while let Some((line, stmt)) = statements.next() {
-            log::trace!("{}", line);
-            if stmt.is_label() {
-                info.leaders.insert(line);
-                let id = stmt.label_id();
-                info.labels.insert(id, line);
-            } else if stmt.is_func() {
-                info.leaders.insert(line);
-                let id = stmt.label_id();
-                info.funcs.insert(id, line);
-            } else if stmt.is_call() {
-                let id = stmt.label_id();
-                info.add_call(id, line);
-                if statements.peek().is_some() {
-                    info.leaders.insert(line + 1);
-                }
-            } else if stmt.is_jump() && statements.peek().is_some() {
-                info.leaders.insert(line + 1);
-            }
-        }
-        log::trace!("Info:\n{:#?}", info);
-        info
+    pub fn entry(&self) -> &BasicBlock {
+        self.graph
+            .get(self.entry.unwrap())
+            .expect("No entrypoint set on CFG")
     }
 
+    // TODO: handle calls
     /// Get the [BasicBlock] ids for all the outgoing edges of the given basic block
     fn get_outgoing_edges(
         block: &BasicBlock,
@@ -126,7 +117,6 @@ impl FlowGraph {
         info: &ICInfo,
         leaders: &HashMap<ICLineNumber, id_arena::Id<BasicBlock>>,
     ) -> Vec<id_arena::Id<BasicBlock>> {
-        // return vec![];
         let mut out = vec![];
         let last_stmt = icode.get_statement(block.end);
         if last_stmt.is_unconditional_jump() {
@@ -149,6 +139,10 @@ impl FlowGraph {
             let leader = block.end + 1;
             let block = leaders.get(&leader).unwrap();
             out.push(*block);
+        } else if last_stmt.is_return() {
+            // Function doesn't know where it will return to
+        } else if let Some(next_block) = leaders.get(&(block.end + 1)) {
+            out.push(*next_block);
         }
         out
     }
@@ -165,6 +159,14 @@ impl<'a> dot::Labeller<'a, Vertex<'a>, Edge> for &FlowGraph {
     fn node_id(&'a self, n: &Vertex) -> dot::Id {
         let (_, node) = n;
         dot::Id::new(node.to_string()).unwrap()
+    }
+
+    fn node_shape(&'a self, n: &Vertex<'a>) -> Option<dot::LabelText<'a>> {
+        if n.1.is_entry {
+            Some(dot::LabelText::LabelStr("box".into()))
+        } else {
+            None
+        }
     }
 }
 

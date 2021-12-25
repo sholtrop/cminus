@@ -1,8 +1,13 @@
-
 int main(void)
 {
-    if (0)
+    while (1)
+    {
         return 0;
-    else
-        return 1;
+    }
+
+    // int a = 1, b = 2, c = 3;
+    // if (a && b && c)
+    // {
+    //     return a + b + c;
+    // }
 }

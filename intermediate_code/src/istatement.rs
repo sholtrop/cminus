@@ -81,8 +81,12 @@ impl IStatement {
         self.operator == IOperator::FuncCall
     }
 
+    pub fn is_return(&self) -> bool {
+        self.operator == IOperator::Return
+    }
+
     pub fn label_id(&self) -> SymbolId {
-        if self.is_unconditional_jump() || self.is_label() || self.is_func() {
+        if self.is_unconditional_jump() || self.is_label() || self.is_func() || self.is_call() {
             self.operand1.as_ref().unwrap().id()
         } else if self.is_conditional_jump() {
             self.ret_target.as_ref().unwrap().id()

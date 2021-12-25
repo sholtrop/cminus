@@ -285,6 +285,10 @@ impl<'a> IVisitor<'a> {
             // end-else label
             self.icode
                 .append_statement(IStatement::make_label(end_else_label));
+        } else {
+            // passed if-body label
+            self.icode
+                .append_statement(IStatement::make_label(else_label));
         }
     }
 

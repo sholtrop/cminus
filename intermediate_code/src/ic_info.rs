@@ -8,18 +8,10 @@ pub struct ICInfo {
     pub leaders: BTreeSet<ICLineNumber>,
     pub labels: HashMap<SymbolId, ICLineNumber>,
     pub calls: HashMap<SymbolId, Vec<ICLineNumber>>,
-    pub funcs: HashMap<SymbolId, ICLineNumber>,
+    pub funcs: HashMap<ICLineNumber, SymbolId>,
 }
 
 impl ICInfo {
-    pub fn new() -> Self {
-        Self {
-            leaders: BTreeSet::new(),
-            labels: HashMap::new(),
-            calls: HashMap::new(),
-            funcs: HashMap::new(),
-        }
-    }
     pub fn add_call(&mut self, id: SymbolId, line: ICLineNumber) {
         self.calls
             .entry(id)
@@ -28,7 +20,39 @@ impl ICInfo {
     }
 }
 
+impl From<&IntermediateCode> for ICInfo {
+    fn from(icode: &IntermediateCode) -> Self {
+        let mut info = Self {
+            ..Default::default()
+        };
+        let mut statements = icode.into_iter().peekable();
+        while let Some((line, stmt)) = statements.next() {
+            log::trace!("{}", line);
+            if stmt.is_label() {
+                info.leaders.insert(line);
+                let id = stmt.label_id();
+                info.labels.insert(id, line);
+            } else if stmt.is_func() {
+                info.leaders.insert(line);
+                let id = stmt.label_id();
+                info.funcs.insert(line, id);
+            } else if stmt.is_call() {
+                let id = stmt.label_id();
+                info.add_call(id, line);
+                if statements.peek().is_some() {
+                    info.leaders.insert(line + 1);
+                }
+            } else if stmt.is_jump() && statements.peek().is_some() {
+                info.leaders.insert(line + 1);
+            }
+        }
+        info
+    }
+}
+
 use std::fmt;
+
+use crate::intermediate_code::IntermediateCode;
 
 #[derive(Clone, PartialEq, Eq, Hash, Copy, Debug, PartialOrd, Ord)]
 pub struct ICLineNumber(pub usize);

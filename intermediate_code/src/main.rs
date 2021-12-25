@@ -76,7 +76,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .unwrap()
                     .write_all(graph.to_string().as_bytes())
                     .unwrap();
-                log::info!("Saved control flow graph to {}", filename);
+                log::info!(
+                    "Saved control flow graph to {} with entrypoint {}",
+                    filename,
+                    graph.entry()
+                );
             }
             Ok(())
         }
