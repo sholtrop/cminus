@@ -3,7 +3,6 @@ use crate::{
     intermediate_code::IntermediateCode,
 };
 use id_arena::Arena;
-use itertools::Itertools;
 use std::{borrow::Cow, fmt};
 use syntax::SymbolTable;
 
@@ -61,27 +60,15 @@ impl FlowGraph {
         let info = FlowGraph::icode_to_info(icode);
         let mut iter = info.leaders.iter();
         let mut entry = None;
-        let mut prev_block = None;
-        let mut prev_line: Option<&ICLineNumber> = None;
+        let mut prev_line = iter.next().unwrap();
         log::trace!("before loop");
         for curr_line in iter {
-            if let Some(prev_line) = prev_line {
-                log::trace!("{} {}", prev_line, curr_line);
-                let id = graph.alloc(BasicBlock::new(*prev_line, *curr_line - 1));
-                prev_block = Some(id);
-                if let Some(sym) = info.funcs.get(curr_line) {
-                    if table.get_main_id() == *sym {
-                        entry = Some(id);
-                    }
-                    log::trace!("is func {}", sym);
-                }
-            }
-            prev_line = Some(curr_line);
+            log::trace!("{} {}", prev_line, curr_line);
+            graph.alloc(BasicBlock::new(*prev_line, *curr_line - 1));
+            prev_line = curr_line;
         }
-        graph.alloc(BasicBlock::new(
-            *prev_line.unwrap(),
-            icode.n_statements().into(),
-        ));
+        graph.alloc(BasicBlock::new(*prev_line, icode.n_statements().into()));
+        // for (id, block) in graph.iter_mut() {}
         Self { graph, entry }
     }
 
@@ -89,6 +76,7 @@ impl FlowGraph {
         let mut info = ICInfo::new();
         let mut statements = icode.into_iter().peekable();
         while let Some((line, stmt)) = statements.next() {
+            log::trace!("{}", line);
             if stmt.is_label() {
                 info.leaders.insert(line);
                 let id = stmt.label_id();
@@ -109,6 +97,16 @@ impl FlowGraph {
         }
         log::trace!("Info:\n{:#?}", info);
         info
+    }
+
+    fn get_outgoing_edges(
+        &self,
+        block: BasicBlock,
+        icode: &IntermediateCode,
+    ) -> Vec<id_arena::Id<BasicBlock>> {
+        let mut edges = vec![];
+        for s in icode.into_iter().skip(block.start.0).take(block.end.0) {}
+        edges
     }
 }
 

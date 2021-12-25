@@ -19,27 +19,28 @@ impl IntermediateCode {
         self.statements.push(statement);
     }
 
-    pub fn insert_statement(&mut self, statement: IStatement, index: usize) {
-        self.statements.insert(index, statement);
+    pub fn insert_statement(&mut self, statement: IStatement, line: ICLineNumber) {
+        self.statements.insert(line.0 - 1, statement);
     }
 
-    pub fn remove_statement(&mut self, index: usize) {
-        self.statements.remove(index);
+    pub fn remove_statement(&mut self, line: ICLineNumber) {
+        self.statements.remove(line.0 - 1);
     }
 
-    /// Can give a negative index, which will index starting from the end of the statement list counting backwards.
-    pub fn get_statement(&self, mut idx: i32) -> &IStatement {
-        if idx < 0 {
-            idx += self.n_statements() as i32;
-        }
-        &self.statements[idx as usize]
+    /// [ICLineNumber] (not index) means '1' is the first statement
+    pub fn get_statement(&self, line: ICLineNumber) -> &IStatement {
+        &self.statements[line.0 - 1]
+    }
+
+    pub fn get_statements(&self, start: ICLineNumber, end: ICLineNumber) -> &[IStatement] {
+        &self.statements[start.0 - 1..end.0 - 1]
     }
 }
 
 impl fmt::Display for IntermediateCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for statement in &self.statements {
-            writeln!(f, "{}", statement)?;
+        for (line, statement) in self.into_iter() {
+            writeln!(f, "{:<3} {}", format!("{}", line), format!("{}", statement))?;
         }
         Ok(())
     }
@@ -68,11 +69,9 @@ impl<'a> Iterator for ICodeIterator<'a> {
         if self.index == self.icode.n_statements() {
             None
         } else {
+            let line = self.index.into();
             self.index += 1;
-            Some((
-                ICLineNumber(self.index),
-                self.icode.get_statement((self.index - 1) as i32),
-            ))
+            Some((line, self.icode.get_statement(line)))
         }
     }
 }

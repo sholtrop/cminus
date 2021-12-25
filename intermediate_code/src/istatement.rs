@@ -80,9 +80,6 @@ impl IStatement {
 
 impl fmt::Display for IStatement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.operator == IOperator::Func {
-            writeln!(f)?;
-        }
         write!(
             f,
             "{}{}{}",

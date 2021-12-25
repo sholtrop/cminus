@@ -278,7 +278,7 @@ impl<'a> IVisitor<'a> {
             // jump over the else-body if condition was true
             self.icode.insert_statement(
                 IStatement::make_goto(end_else_label),
-                self.icode.n_statements() - 1,
+                self.icode.n_statements().into(),
             );
             // else-body
             self.accept(else_branch);

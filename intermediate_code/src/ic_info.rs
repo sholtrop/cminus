@@ -41,7 +41,13 @@ impl fmt::Display for ICLineNumber {
 
 impl From<usize> for ICLineNumber {
     fn from(line: usize) -> Self {
-        Self(line)
+        Self(line + 1)
+    }
+}
+
+impl From<ICLineNumber> for usize {
+    fn from(line: ICLineNumber) -> Self {
+        line.0 - 1
     }
 }
 
