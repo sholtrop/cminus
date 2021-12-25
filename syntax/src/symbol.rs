@@ -17,6 +17,7 @@ pub enum ReturnType {
     Uint8Array,
     Real,
     Bool,
+    Label,
 }
 
 impl From<&ReturnType> for usize {
@@ -71,6 +72,7 @@ impl fmt::Display for ReturnType {
                 ReturnType::Uint8Array => "uint8_array",
                 ReturnType::Real => "real",
                 ReturnType::Bool => "bool",
+                ReturnType::Label => "label",
             }
         )
     }

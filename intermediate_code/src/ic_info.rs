@@ -8,7 +8,7 @@ pub struct ICInfo {
     pub leaders: BTreeSet<ICLineNumber>,
     pub labels: HashMap<SymbolId, ICLineNumber>,
     pub calls: HashMap<SymbolId, Vec<ICLineNumber>>,
-    pub funcs: HashMap<ICLineNumber, SymbolId>,
+    pub funcs: HashMap<SymbolId, ICLineNumber>,
 }
 
 impl ICInfo {

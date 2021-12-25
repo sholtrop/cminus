@@ -3,7 +3,7 @@ use crate::{
     intermediate_code::IntermediateCode,
 };
 use id_arena::Arena;
-use std::{borrow::Cow, fmt};
+use std::{borrow::Cow, collections::HashMap, fmt};
 use syntax::SymbolTable;
 
 #[derive(Clone)]
@@ -60,15 +60,35 @@ impl FlowGraph {
         let info = FlowGraph::icode_to_info(icode);
         let mut iter = info.leaders.iter();
         let mut entry = None;
-        let mut prev_line = iter.next().unwrap();
-        log::trace!("before loop");
-        for curr_line in iter {
-            log::trace!("{} {}", prev_line, curr_line);
-            graph.alloc(BasicBlock::new(*prev_line, *curr_line - 1));
-            prev_line = curr_line;
+        let mut prev_leader = iter.next().unwrap();
+        let mut leader_to_block = HashMap::new();
+        for curr_leader in iter {
+            let id = graph.alloc(BasicBlock::new(*prev_leader, *curr_leader - 1));
+            leader_to_block.insert(*prev_leader, id);
+            prev_leader = curr_leader;
         }
-        graph.alloc(BasicBlock::new(*prev_line, icode.n_statements().into()));
-        // for (id, block) in graph.iter_mut() {}
+        {
+            let last = graph.alloc(BasicBlock::new(
+                *prev_leader,
+                (icode.n_statements() - 1).into(),
+            ));
+            leader_to_block.insert(*prev_leader, last);
+        }
+
+        for block_id in leader_to_block.values() {
+            let out;
+            {
+                let block = graph.get_mut(*block_id).unwrap();
+                out = FlowGraph::get_outgoing_edges(block, icode, &info, &leader_to_block);
+                for b in out.iter() {
+                    block.outgoing.push(*b);
+                }
+            }
+            for b in out {
+                let block = graph.get_mut(b).unwrap();
+                block.incoming.push(*block_id);
+            }
+        }
         Self { graph, entry }
     }
 
@@ -84,29 +104,53 @@ impl FlowGraph {
             } else if stmt.is_func() {
                 info.leaders.insert(line);
                 let id = stmt.label_id();
-                info.funcs.insert(line, id);
-            } else if stmt.is_jump() && statements.peek().is_some() {
-                info.leaders.insert(line + 1);
+                info.funcs.insert(id, line);
             } else if stmt.is_call() {
                 let id = stmt.label_id();
                 info.add_call(id, line);
                 if statements.peek().is_some() {
                     info.leaders.insert(line + 1);
                 }
+            } else if stmt.is_jump() && statements.peek().is_some() {
+                info.leaders.insert(line + 1);
             }
         }
         log::trace!("Info:\n{:#?}", info);
         info
     }
 
+    /// Get the [BasicBlock] ids for all the outgoing edges of the given basic block
     fn get_outgoing_edges(
-        &self,
-        block: BasicBlock,
+        block: &BasicBlock,
         icode: &IntermediateCode,
+        info: &ICInfo,
+        leaders: &HashMap<ICLineNumber, id_arena::Id<BasicBlock>>,
     ) -> Vec<id_arena::Id<BasicBlock>> {
-        let mut edges = vec![];
-        for s in icode.into_iter().skip(block.start.0).take(block.end.0) {}
-        edges
+        // return vec![];
+        let mut out = vec![];
+        let last_stmt = icode.get_statement(block.end);
+        if last_stmt.is_unconditional_jump() {
+            let label = last_stmt.label_id();
+            log::trace!("uncond - labelid: {}", label);
+            let leader = info.labels.get(&label).unwrap();
+            let block = leaders.get(leader).unwrap();
+            out.push(*block);
+        } else if last_stmt.is_conditional_jump() {
+            let leader_if = block.end + 1;
+            let block = leaders.get(&leader_if).unwrap();
+            out.push(*block);
+            let label = last_stmt.label_id();
+            log::trace!("cond - labelid: {}", label);
+            let leader_else = info.labels.get(&label).unwrap();
+            let block = leaders.get(leader_else).unwrap();
+            out.push(*block);
+        } else if last_stmt.is_call() {
+            log::trace!("call");
+            let leader = block.end + 1;
+            let block = leaders.get(&leader).unwrap();
+            out.push(*block);
+        }
+        out
     }
 }
 
@@ -133,7 +177,7 @@ impl<'a> dot::GraphWalk<'a, Vertex<'a>, Edge> for &FlowGraph {
     fn edges(&'a self) -> dot::Edges<'a, Edge> {
         let mut v = Vec::<Edge>::with_capacity(self.graph.len());
         for (id, node) in self.graph.iter() {
-            for neighbor in node.incoming.clone() {
+            for neighbor in node.outgoing.clone() {
                 v.push((id, neighbor));
             }
         }

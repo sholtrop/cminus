@@ -21,7 +21,7 @@ impl IStatement {
             operator: IOperator::Label,
             operand1: Some(IOperand::Symbol {
                 id: label_id,
-                ret_type: ReturnType::Void,
+                ret_type: ReturnType::Label,
             }),
             operand2: None,
             ret_target: None,
@@ -34,7 +34,7 @@ impl IStatement {
             operator: IOperator::Goto,
             operand1: Some(IOperand::Symbol {
                 id: target_id,
-                ret_type: ReturnType::Void,
+                ret_type: ReturnType::Label,
             }),
             operand2: None,
             ret_target: None,
@@ -49,11 +49,14 @@ impl IStatement {
         self.operator == IOperator::Func
     }
 
-    pub fn is_jump(&self) -> bool {
+    pub fn is_unconditional_jump(&self) -> bool {
+        self.operator == IOperator::Goto
+    }
+
+    pub fn is_conditional_jump(&self) -> bool {
         matches!(
             self.operator,
-            IOperator::Goto
-                | IOperator::Jl
+            IOperator::Jl
                 | IOperator::Ja
                 | IOperator::Jae
                 | IOperator::Jb
@@ -65,8 +68,13 @@ impl IStatement {
                 | IOperator::Je
                 | IOperator::Jz
                 | IOperator::Jnz
-                | IOperator::Return
         )
+    }
+
+    pub fn is_jump(&self) -> bool {
+        self.is_conditional_jump()
+            || self.is_unconditional_jump()
+            || self.operator == IOperator::Return
     }
 
     pub fn is_call(&self) -> bool {
@@ -74,7 +82,13 @@ impl IStatement {
     }
 
     pub fn label_id(&self) -> SymbolId {
-        self.operand1.as_ref().unwrap().id()
+        if self.is_unconditional_jump() || self.is_label() || self.is_func() {
+            self.operand1.as_ref().unwrap().id()
+        } else if self.is_conditional_jump() {
+            self.ret_target.as_ref().unwrap().id()
+        } else {
+            unreachable!()
+        }
     }
 }
 

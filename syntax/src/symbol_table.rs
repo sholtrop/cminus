@@ -196,7 +196,7 @@ impl SymbolTable {
                 name: SymbolName(name),
                 symbol_type: SymbolType::Label,
                 line: 0,
-                return_type: ReturnType::Void,
+                return_type: ReturnType::Label,
             },
             SymbolScope::Local {
                 owning_function: func_id,

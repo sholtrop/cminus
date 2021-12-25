@@ -270,9 +270,6 @@ impl<'a> IVisitor<'a> {
         });
         // If-body
         self.accept(if_branch);
-        // else-label
-        self.icode
-            .append_statement(IStatement::make_label(else_label));
         if let Some(else_branch) = else_branch {
             let end_else_label = self.make_label();
             // jump over the else-body if condition was true
@@ -280,6 +277,9 @@ impl<'a> IVisitor<'a> {
                 IStatement::make_goto(end_else_label),
                 self.icode.n_statements().into(),
             );
+            // else-label
+            self.icode
+                .append_statement(IStatement::make_label(else_label));
             // else-body
             self.accept(else_branch);
             // end-else label
