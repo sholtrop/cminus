@@ -91,12 +91,13 @@ impl SyntaxBuilder {
         func_id: &SymbolId,
         new_root: SyntaxNode,
     ) -> Result<(), SyntaxBuilderError> {
-        let func_root = self.tree.functions.get_mut(func_id).ok_or_else(|| {
-            SyntaxBuilderError(format!(
+        let func_root = self.tree.functions.get_mut(func_id).unwrap_or_else(|| {
+            panic!(
                 "Cannot attach root: Function with id {:?} not found",
                 func_id
-            ))
-        })?;
+            )
+        });
+        log::trace!("ATTACH ROOT {}", func_id);
         func_root.tree = Some(new_root);
         Ok(())
     }

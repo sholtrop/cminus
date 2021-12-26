@@ -8,7 +8,8 @@ pub struct ICInfo {
     pub leaders: BTreeSet<ICLineNumber>,
     pub labels: HashMap<SymbolId, ICLineNumber>,
     pub calls: HashMap<SymbolId, Vec<ICLineNumber>>,
-    pub funcs: HashMap<ICLineNumber, SymbolId>,
+    pub funcs: HashMap<SymbolId, ICLineNumber>,
+    pub returns: HashMap<SymbolId, Vec<ICLineNumber>>,
 }
 
 impl ICInfo {
@@ -16,7 +17,14 @@ impl ICInfo {
         self.calls
             .entry(id)
             .and_modify(|vec| vec.push(line))
-            .or_insert_with(Vec::new);
+            .or_insert_with(|| vec![line]);
+    }
+
+    pub fn add_return(&mut self, id: SymbolId, line: ICLineNumber) {
+        self.returns
+            .entry(id)
+            .and_modify(|vec| vec.push(line))
+            .or_insert_with(|| vec![line]);
     }
 }
 
@@ -26,8 +34,9 @@ impl From<&IntermediateCode> for ICInfo {
             ..Default::default()
         };
         let mut statements = icode.into_iter().peekable();
+        let mut current_func = None;
         while let Some((line, stmt)) = statements.next() {
-            log::trace!("{}", line);
+            log::trace!("{} - {}", line, stmt);
             if stmt.is_label() {
                 info.leaders.insert(line);
                 let id = stmt.label_id();
@@ -35,14 +44,23 @@ impl From<&IntermediateCode> for ICInfo {
             } else if stmt.is_func() {
                 info.leaders.insert(line);
                 let id = stmt.label_id();
-                info.funcs.insert(line, id);
+                info.funcs.insert(id, line);
+                if let Some(current_func) = current_func {
+                    // Entering a new function. Last statement of the current function becomes an implicit return
+                    // to be optimized away later if necessary.
+                    info.add_return(current_func, line - 1);
+                }
+                current_func = Some(id);
             } else if stmt.is_call() {
                 let id = stmt.label_id();
                 info.add_call(id, line);
                 if statements.peek().is_some() {
                     info.leaders.insert(line + 1);
                 }
-            } else if stmt.is_jump() && statements.peek().is_some() {
+            } else if stmt.is_return() {
+                info.add_return(current_func.unwrap(), line);
+            }
+            if stmt.is_jump() && statements.peek().is_some() {
                 info.leaders.insert(line + 1);
             }
         }

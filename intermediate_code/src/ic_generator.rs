@@ -32,7 +32,9 @@ pub fn generate(
     let func_ids = table.get_function_ids();
     let mut visitor = IVisitor::new(table);
     for id in func_ids {
-        let func = tree.get_root(&id).expect("Function not found");
+        let func = tree
+            .get_root(&id)
+            .unwrap_or_else(|| panic!("Function with id {} not found", id));
         visitor.visit_function(func, id);
     }
     let mut icode = visitor.result();

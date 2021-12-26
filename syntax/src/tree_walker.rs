@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use crate::{
     error::SyntaxBuilderError,
+    error::SyntaxBuilderWarning,
     id::{SymbolId, SymbolName},
     node::{NodeType, SyntaxNode},
     symbol::{ReturnType, Symbol, SymbolType},
@@ -119,12 +120,12 @@ impl TreeWalker {
                         _ => unreachable!("Expected function body"),
                     };
                 };
+                log::trace!("func_body: {}", func_body);
                 if return_type != ReturnType::Void && !self.func_has_return {
-                    visitor.handle_error(SyntaxBuilderError(format!(
+                    visitor.add_warning(&SyntaxBuilderWarning(format!(
                         "Function `{}` has no return, should return {}",
                         name.0, return_type
                     )));
-                    return ParserValue::Skip;
                 }
                 if let Err(e) = visitor.visit_func_end(&id, func_body) {
                     e.into()

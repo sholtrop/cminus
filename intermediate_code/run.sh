@@ -1,1 +1,1 @@
-RUST_LOG='intermediate_code=trace' cargo run -- "$@"
+RUST_LOG='intermediate_code=trace,syntax=trace' cargo run -- "$@"

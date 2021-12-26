@@ -183,6 +183,7 @@ impl Visitor {
         id: &SymbolId,
         root: SyntaxNode,
     ) -> Result<(), SyntaxBuilderError> {
+        log::trace!("VISIT FUNC END {}", id);
         self.builder.attach_root(id, root)?;
         self.builder.leave_function();
         self.leave_local_scope();

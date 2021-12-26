@@ -1,13 +1,18 @@
+int something(void)
+{
+    int x = 0;
+}
+
 int main(void)
 {
-    while (1)
+    int x = 1 + 2 + 3 + 4;
+    if (x > 0)
     {
-        return 0;
+        x = 1;
     }
-
-    // int a = 1, b = 2, c = 3;
-    // if (a && b && c)
-    // {
-    //     return a + b + c;
-    // }
+    else
+    {
+        x = 2;
+    }
+    return x + something();
 }

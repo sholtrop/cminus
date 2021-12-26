@@ -59,7 +59,6 @@ pub struct FlowGraph {
 
 impl FlowGraph {
     pub fn new(table: &SymbolTable, icode: &IntermediateCode) -> Self {
-        let main_id = table.get_main_id();
         let mut graph = Arena::new();
         let info = ICInfo::from(icode);
         let mut iter = info.leaders.iter();
@@ -67,15 +66,13 @@ impl FlowGraph {
         let mut prev_leader = iter.next().unwrap();
         let mut leader_to_block = HashMap::new();
         for curr_leader in iter {
-            let id = graph.alloc(BasicBlock::new(*prev_leader, *curr_leader - 1));
+            log::trace!("leader: {}", curr_leader);
+            let block = BasicBlock::new(*prev_leader, *curr_leader - 1);
+            let id = graph.alloc(block);
             leader_to_block.insert(*prev_leader, id);
-            if let Some(sym_id) = info.funcs.get(prev_leader) {
-                if *sym_id == main_id {
-                    let entry_block_id = *leader_to_block.get(prev_leader).unwrap();
-                    entry = Some(*leader_to_block.get(prev_leader).unwrap());
-                    let entry_block = graph.get_mut(entry_block_id).unwrap();
-                    entry_block.is_entry = true;
-                }
+            if FlowGraph::line_is_main(table, prev_leader, icode) {
+                entry = Some(id);
+                graph.get_mut(id).unwrap().is_entry = true;
             }
             prev_leader = curr_leader;
         }
@@ -85,6 +82,10 @@ impl FlowGraph {
                 (icode.n_statements() - 1).into(),
             ));
             leader_to_block.insert(*prev_leader, last);
+            if FlowGraph::line_is_main(table, prev_leader, icode) {
+                entry = Some(last);
+                graph.get_mut(last).unwrap().is_entry = true;
+            }
         }
         for block_id in leader_to_block.values() {
             let out;
@@ -100,17 +101,17 @@ impl FlowGraph {
                 block.incoming.push(*block_id);
             }
         }
+        FlowGraph::add_calls(&mut graph, &leader_to_block, &info);
         Self { graph, entry }
     }
 
     pub fn entry(&self) -> &BasicBlock {
         self.graph
-            .get(self.entry.unwrap())
-            .expect("No entrypoint set on CFG")
+            .get(self.entry.expect("No entrypoint set on CFG"))
+            .unwrap()
     }
 
-    // TODO: handle calls
-    /// Get the [BasicBlock] ids for all the outgoing edges of the given basic block
+    /// Get the [BasicBlock] ids for all the outgoing edges of the given basic block except for calls
     fn get_outgoing_edges(
         block: &BasicBlock,
         icode: &IntermediateCode,
@@ -136,15 +137,54 @@ impl FlowGraph {
             out.push(*block);
         } else if last_stmt.is_call() {
             log::trace!("call");
-            let leader = block.end + 1;
-            let block = leaders.get(&leader).unwrap();
+            let func_id = last_stmt.label_id();
+            let line = info.funcs.get(&func_id).unwrap();
+            let block = leaders.get(line).unwrap();
             out.push(*block);
-        } else if last_stmt.is_return() {
-            // Function doesn't know where it will return to
-        } else if let Some(next_block) = leaders.get(&(block.end + 1)) {
-            out.push(*next_block);
         }
+
+        // else if last_stmt.is_return() {
+        //     // Function doesn't know where it will return to. This is handled in `add_calls`.
+        // } else if let Some(next_block_id) = leaders.get(&(block.end + 1)) {
+        //     // This block 'naturally'
+        //     out.push(*next_block_id);
+        // }
         out
+    }
+
+    fn line_is_main(table: &SymbolTable, line: &ICLineNumber, icode: &IntermediateCode) -> bool {
+        let stmt = icode.get_statement(*line);
+        if !stmt.is_func() {
+            return false;
+        }
+        let sym_id = icode.get_statement(*line).label_id();
+        sym_id == table.get_main_id()
+    }
+
+    fn add_calls(
+        graph: &mut Arena<BasicBlock>,
+        leader_to_block: &HashMap<ICLineNumber, id_arena::Id<BasicBlock>>,
+        info: &ICInfo,
+    ) {
+        log::trace!("Returns: {:#?}", info.returns);
+        for (id, calls) in &info.calls {
+            let returns = info.returns.get(id).unwrap();
+            // Requires complex scoping to keep the borrow checker happy
+            for call in calls {
+                let after_call_bid = *leader_to_block.get(&(*call + 1)).unwrap();
+                for ret in returns {
+                    let ret_bid = {
+                        let (ret_bid, ret_block) =
+                            graph.iter_mut().find(|(_, b)| b.end == *ret).unwrap();
+                        log::trace!("{} returns to {}", ret, *call + 1);
+                        ret_block.outgoing.push(after_call_bid);
+                        ret_bid
+                    };
+                    let call_block = graph.get_mut(after_call_bid).unwrap();
+                    call_block.incoming.push(ret_bid);
+                }
+            }
+        }
     }
 }
 
