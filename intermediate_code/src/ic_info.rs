@@ -45,22 +45,6 @@ impl From<&IntermediateCode> for ICInfo {
                 info.leaders.insert(line);
                 let id = stmt.label_id();
                 info.funcs.insert(id, line);
-                // if let Some(current_func) = current_func {
-                //     // Entering a new function. Last statement of the current function becomes an implicit return
-                //     // to be optimized away later if necessary.
-                //     // One small optimization is performed already: Don't add an implicit return if the
-                //     // very last statement of the function was a jump or a recursive call
-                //     // Note that this is a rough heuristic and does not prevent *all* unnecessary implicit returns.
-                //     let last_stmt = icode.get_statement(line - 1);
-                //     if !last_stmt.is_jump() && !last_stmt.is_recursive_call(&current_func) {
-                //         log::trace!(
-                //             "Add implicit return from line {} for function {}",
-                //             line - 1,
-                //             current_func
-                //         );
-                //         info.add_return(current_func, line - 1);
-                //     }
-                // }
                 current_func = Some(id);
             } else if stmt.is_call() {
                 let id = stmt.label_id();

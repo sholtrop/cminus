@@ -141,14 +141,16 @@ impl FlowGraph {
             let line = info.funcs.get(&func_id).unwrap();
             let block = leaders.get(line).unwrap();
             out.push(*block);
+        } else if last_stmt.is_return() {
+            // Function doesn't know where it will return to. This is handled in [FlowGraph::add_calls].
+        } else if let Some(next_block_id) = leaders.get(&(block.end + 1)) {
+            // The next line is a label.
+            // Control flow will therefore naturally go from current block to the next.
+            let next_line = icode.get_statement(block.end + 1);
+            if next_line.is_label() {
+                out.push(*next_block_id);
+            }
         }
-
-        // else if last_stmt.is_return() {
-        //     // Function doesn't know where it will return to. This is handled in [FlowGraph::add_calls].
-        // } else if let Some(next_block_id) = leaders.get(&(block.end + 1)) {
-        //     // This block 'naturally'
-        //     out.push(*next_block_id);
-        // }
         out
     }
 

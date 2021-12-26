@@ -10,6 +10,7 @@ pub mod ivisitor;
 
 use crate::error::ICodeError;
 use crate::ic_generator::{Intermediate, OptLevel};
+use ::intermediate_code::save_cfg;
 use clap::clap_app;
 use general::logging::init_logger_from_env;
 use std::io::Write;
@@ -59,28 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
             }
             if let Some(filename) = graph_filename {
-                let mut dot = Command::new("dot")
-                    .arg("-Tpng")
-                    .arg("-o")
-                    .arg(filename)
-                    .stdin(Stdio::piped())
-                    .spawn()
-                    .unwrap_or_else(|e| {
-                        panic!(
-                            "Could not create {}. Is graphviz installed on your system?\n{}",
-                            filename, e
-                        )
-                    });
-                dot.stdin
-                    .as_mut()
-                    .unwrap()
-                    .write_all(graph.to_string().as_bytes())
-                    .unwrap();
-                log::info!(
-                    "Saved control flow graph to {} with entrypoint {}",
-                    filename,
-                    graph.entry()
-                );
+                save_cfg(filename, graph);
             }
             Ok(())
         }

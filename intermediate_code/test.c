@@ -1,14 +1,12 @@
-int something_else(void)
-{
-    return 1;
-}
 
-int something(void)
+void something(void)
 {
-    something_else();
+    while (1)
+    {
+        }
 }
 
 int main(void)
 {
-    return something();
+    return 1;
 }
