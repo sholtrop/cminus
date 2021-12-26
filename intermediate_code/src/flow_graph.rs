@@ -144,7 +144,7 @@ impl FlowGraph {
         }
 
         // else if last_stmt.is_return() {
-        //     // Function doesn't know where it will return to. This is handled in `add_calls`.
+        //     // Function doesn't know where it will return to. This is handled in [FlowGraph::add_calls].
         // } else if let Some(next_block_id) = leaders.get(&(block.end + 1)) {
         //     // This block 'naturally'
         //     out.push(*next_block_id);
@@ -168,20 +168,21 @@ impl FlowGraph {
     ) {
         log::trace!("Returns: {:#?}", info.returns);
         for (id, calls) in &info.calls {
-            let returns = info.returns.get(id).unwrap();
-            // Requires complex scoping to keep the borrow checker happy
-            for call in calls {
-                let after_call_bid = *leader_to_block.get(&(*call + 1)).unwrap();
-                for ret in returns {
-                    let ret_bid = {
-                        let (ret_bid, ret_block) =
-                            graph.iter_mut().find(|(_, b)| b.end == *ret).unwrap();
-                        log::trace!("{} returns to {}", ret, *call + 1);
-                        ret_block.outgoing.push(after_call_bid);
-                        ret_bid
-                    };
-                    let call_block = graph.get_mut(after_call_bid).unwrap();
-                    call_block.incoming.push(ret_bid);
+            if let Some(returns) = info.returns.get(id) {
+                // Requires complex scoping to keep the borrow checker happy
+                for call in calls {
+                    let after_call_bid = *leader_to_block.get(&(*call + 1)).unwrap();
+                    for ret in returns {
+                        let ret_bid = {
+                            let (ret_bid, ret_block) =
+                                graph.iter_mut().find(|(_, b)| b.end == *ret).unwrap();
+                            log::trace!("{} returns to {}", ret, *call + 1);
+                            ret_block.outgoing.push(after_call_bid);
+                            ret_bid
+                        };
+                        let call_block = graph.get_mut(after_call_bid).unwrap();
+                        call_block.incoming.push(ret_bid);
+                    }
                 }
             }
         }

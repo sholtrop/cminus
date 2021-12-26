@@ -221,10 +221,24 @@ impl<'a> IVisitor<'a> {
             ret_target: None,
         });
         self.accept(func);
+        let last_stmt = self.icode.get_last_statement();
+        if !last_stmt.is_jump() && !last_stmt.is_recursive_call(&func_id) {
+            self.add_implicit_return(func.return_type());
+        }
     }
 
     fn current_func(&self) -> SymbolId {
         *self.func_stack.last().unwrap()
+    }
+
+    fn add_implicit_return(&mut self, ret_type: ReturnType) {
+        self.icode.append_statement(IStatement {
+            operator: IOperator::Return,
+            op_type: ret_type.into(),
+            operand1: None,
+            operand2: None,
+            ret_target: None,
+        })
     }
 
     fn visit_assignment(&mut self, l_var: &SyntaxNode, r_expr: &SyntaxNode) -> IOperand {

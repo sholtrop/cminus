@@ -81,6 +81,10 @@ impl IStatement {
         self.operator == IOperator::FuncCall
     }
 
+    pub fn is_recursive_call(&self, current_func: &SymbolId) -> bool {
+        self.is_call() && self.label_id() == *current_func
+    }
+
     pub fn is_return(&self) -> bool {
         self.operator == IOperator::Return
     }

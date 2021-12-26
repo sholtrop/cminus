@@ -35,6 +35,11 @@ impl IntermediateCode {
     pub fn get_statements(&self, start: ICLineNumber, end: ICLineNumber) -> &[IStatement] {
         &self.statements[start.0 - 1..end.0 - 1]
     }
+
+    pub fn get_last_statement(&self) -> &IStatement {
+        let last = ICLineNumber(self.n_statements());
+        self.get_statement(last)
+    }
 }
 
 impl fmt::Display for IntermediateCode {
