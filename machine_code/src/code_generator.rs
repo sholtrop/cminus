@@ -1,3 +1,6 @@
+use std::io::Write;
+
+use intermediate_code::{flow_graph::FlowGraph, icode::IntermediateCode};
 use syntax::SymbolTable;
 
 use crate::allocator::OutStream;
@@ -19,5 +22,95 @@ impl CodeGenerator {
 
     pub fn generate_global_decls(&mut self, table: &SymbolTable) {
         for sym in table.get_globals() {}
+    }
+
+    pub fn generate_code(
+        &mut self,
+        table: &SymbolTable,
+        icode: &IntermediateCode,
+        graph: &FlowGraph,
+    ) {
+    }
+
+    pub fn generate_trailer(&mut self) {
+        self.out
+            .write_all(
+                concat!(
+                    ".LC0:\n",
+                    "\t.string \"%d\"\n",
+                    "\t.globl readinteger\n",
+                    "readinteger:\n",
+                    "\tpushq\t%rbp\n",
+                    "\tmovq\t%rsp, %rbp\n",
+                    "\tsubq\t$16, %rsp\n",
+                    "\tleaq\t-12(%rbp), %rsi\n",
+                    "\tleaq\t.LC0(%rip), %rdi\n",
+                    "\tcall\tscanf\n",
+                    "\tmovl\t-12(%rbp), %eax\n",
+                    "\tmovq\t%rbp, %rsp\n",
+                    "\tpopq\t%rbp\n",
+                    "\tret\n"
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+
+        self.out
+            .write_all(
+                concat!(
+                    ".LC1:\n",
+                    "\t.string \"%d\\n\"\n",
+                    "\t.globl writeinteger\n",
+                    "writeinteger:\n",
+                    "\tpushq\t%rbp\n",
+                    "\tmovl\t%edi, %esi\n",
+                    "\tleaq\t.LC1(%rip), %rdi\n",
+                    "\tcall\tprintf\n",
+                    "\tpopq\t%rbp\n",
+                    "\tret\n"
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+
+        self.out
+            .write_all(
+                concat!(
+                    ".LC2:\n",
+                    "\t.string \"%u\"\n",
+                    "\t.globl readunsigned\n",
+                    "readunsigned:\n",
+                    "\tpushq\t%rbp\n",
+                    "\tmovq\t%rsp, %rbp\n",
+                    "\tsubq\t$16, %rsp\n",
+                    "\tleaq\t-12(%rbp), %rsi\n",
+                    "\tleaq\t.LC2(%rip), %rdi\n",
+                    "\tcall\tscanf\n",
+                    "\tmovl\t-12(%rbp), %eax\n",
+                    "\tmovq\t%rbp, %rsp\n",
+                    "\tpopq\t%rbp\n",
+                    "\tret\n"
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+
+        self.out
+            .write_all(
+                concat!(
+                    ".LC3:\n",
+                    "\t.string \"%u\\n\"\n",
+                    "\t.globl writeunsigned\n",
+                    "writeunsigned:\n",
+                    "\tpushq\t%rbp\n",
+                    "\tmovl\t%edi, %esi\n",
+                    "\tleaq\t.LC3(%rip), %rdi\n",
+                    "\tcall\tprintf\n",
+                    "\tpopq\t%rbp\n",
+                    "\tret\n"
+                )
+                .as_bytes(),
+            )
+            .unwrap();
     }
 }
