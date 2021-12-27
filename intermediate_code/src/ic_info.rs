@@ -65,7 +65,7 @@ impl From<&IntermediateCode> for ICInfo {
 
 use std::fmt;
 
-use crate::intermediate_code::IntermediateCode;
+use crate::icode::IntermediateCode;
 
 #[derive(Clone, PartialEq, Eq, Hash, Copy, Debug, PartialOrd, Ord)]
 pub struct ICLineNumber(pub usize);

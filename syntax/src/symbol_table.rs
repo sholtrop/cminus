@@ -223,6 +223,10 @@ impl SymbolTable {
         )
     }
 
+    pub fn get_globals(&self) -> HashMap<SymbolId, Symbol> {
+        unimplemented!()
+    }
+
     pub fn get_main_id(&self) -> SymbolId {
         self.main.expect("Error: `main` function is undefined")
     }

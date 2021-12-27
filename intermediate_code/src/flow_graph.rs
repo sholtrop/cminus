@@ -1,6 +1,6 @@
 use crate::{
     ic_info::{ICInfo, ICLineNumber},
-    intermediate_code::IntermediateCode,
+    icode::IntermediateCode,
 };
 use id_arena::Arena;
 use std::{borrow::Cow, collections::HashMap, fmt};

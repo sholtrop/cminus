@@ -1,4 +1,4 @@
-use crate::intermediate_code::IntermediateCode;
+use crate::icode::IntermediateCode;
 use crate::ioperand::IOperand;
 use crate::ioperator::{IOperator, IOperatorType};
 use crate::istatement::IStatement;

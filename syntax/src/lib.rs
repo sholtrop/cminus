@@ -21,7 +21,7 @@ pub use symbol_table::*;
 pub use syntax_tree::*;
 pub use visitor::*;
 
-/// Take an input [ParseTree] and generate a [SyntaxResult] for it containing the syntax tree + symbol table.
+/// Take an input string and generate a [SyntaxResult] for it containing the syntax tree + symbol table.
 pub fn generate(input: &str) -> Result<SyntaxAnalysisResult, Box<dyn Error>> {
     let parse_tree = lexical::parse(input)?;
     let mut tree_walker = TreeWalker::new();

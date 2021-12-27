@@ -363,6 +363,14 @@ dependencies = [
 [[package]]
 name = "machine-code"
 version = "0.1.0"
+dependencies = [
+ "clap",
+ "general",
+ "intermediate_code",
+ "lexical",
+ "log",
+ "syntax",
+]
 
 [[package]]
 name = "maplit"
