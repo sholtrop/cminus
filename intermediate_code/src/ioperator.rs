@@ -3,8 +3,8 @@ use std::fmt;
 use syntax::NodeType;
 use syntax::ReturnType;
 
-#[derive(PartialEq)]
-pub enum IOperatorType {
+#[derive(PartialEq, Clone, Copy)]
+pub enum IOperatorSize {
     Void,
     Byte,
     Word,
@@ -12,7 +12,7 @@ pub enum IOperatorType {
     Quad,
 }
 
-impl fmt::Display for IOperatorType {
+impl fmt::Display for IOperatorSize {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -28,7 +28,7 @@ impl fmt::Display for IOperatorType {
     }
 }
 
-impl From<ReturnType> for IOperatorType {
+impl From<ReturnType> for IOperatorSize {
     fn from(rt: ReturnType) -> Self {
         match rt {
             ReturnType::Void => Self::Void,
@@ -44,19 +44,19 @@ impl From<ReturnType> for IOperatorType {
     }
 }
 
-impl From<IOperatorType> for usize {
-    fn from(opt: IOperatorType) -> Self {
+impl From<IOperatorSize> for usize {
+    fn from(opt: IOperatorSize) -> Self {
         match opt {
-            IOperatorType::Byte => 1,
-            IOperatorType::Word => 2,
-            IOperatorType::Double => 4,
-            IOperatorType::Quad => 8,
-            IOperatorType::Void => 0,
+            IOperatorSize::Byte => 1,
+            IOperatorSize::Word => 2,
+            IOperatorSize::Double => 4,
+            IOperatorSize::Quad => 8,
+            IOperatorSize::Void => 0,
         }
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum IOperator {
     Unknown,
     Func,

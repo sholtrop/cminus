@@ -126,13 +126,12 @@ impl NodeType {
     }
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Copy)]
 pub enum ConstantNodeValue {
     Uint8(u8),
     Int8(i8),
     Int(i32),
     Uint(u32),
-    ErrorMessage(String),
 }
 
 impl fmt::Display for ConstantNodeValue {
@@ -145,7 +144,6 @@ impl fmt::Display for ConstantNodeValue {
                 Self::Int8(v) => v.to_string(),
                 Self::Int(v) => v.to_string(),
                 Self::Uint(v) => v.to_string(),
-                Self::ErrorMessage(v) => v.to_string(),
             }
         )
     }
@@ -154,7 +152,6 @@ impl fmt::Display for ConstantNodeValue {
 impl From<ConstantNodeValue> for i64 {
     fn from(val: ConstantNodeValue) -> Self {
         match val {
-            ConstantNodeValue::ErrorMessage(msg) => panic!("Node had error message: {}", msg),
             ConstantNodeValue::Int(v) => v.into(),
             ConstantNodeValue::Int8(v) => v.into(),
             ConstantNodeValue::Uint(v) => v.into(),
@@ -231,16 +228,13 @@ pub enum SyntaxNode {
         return_type: ReturnType,
         symbol_id: SymbolId,
     },
+    Error,
     Empty,
 }
 
 impl SyntaxNode {
     pub fn create_error(err: impl ToString) -> Self {
-        SyntaxNode::Constant {
-            node_type: NodeType::Error,
-            return_type: ReturnType::Error,
-            value: ConstantNodeValue::ErrorMessage(err.to_string()),
-        }
+        SyntaxNode::Error
     }
 
     /// Attempt to coerce [SyntaxNode] `from` to [ReturnType] `to`
@@ -276,6 +270,7 @@ impl SyntaxNode {
             | SyntaxNode::Constant { return_type, .. }
             | SyntaxNode::Symbol { return_type, .. } => *return_type,
             SyntaxNode::Empty => ReturnType::Void,
+            SyntaxNode::Error => ReturnType::Error,
         }
     }
 
@@ -286,6 +281,7 @@ impl SyntaxNode {
             | SyntaxNode::Constant { node_type, .. }
             | SyntaxNode::Symbol { node_type, .. } => node_type.clone(),
             SyntaxNode::Empty => NodeType::Empty,
+            SyntaxNode::Error => NodeType::Error,
         }
     }
 
@@ -362,10 +358,7 @@ impl SyntaxNode {
     /// Get a constant node's value
     pub fn get_number(&self) -> ConstantNodeValue {
         if let SyntaxNode::Constant { value, .. } = self {
-            if let ConstantNodeValue::ErrorMessage(_) = value {
-                panic!("Node was an error message: {}", self);
-            }
-            value.clone()
+            *value
         } else {
             panic!("Node {} was not a number", self);
         }
@@ -400,6 +393,7 @@ impl fmt::Display for SyntaxNode {
                 }
             }
             Self::Empty => write!(f, "[EMPTY]"),
+            Self::Error => write!(f, "ERROR"),
         }
     }
 }
@@ -430,17 +424,13 @@ impl ptree::TreeItem for SyntaxNode {
             }
             Self::Constant { .. } => Cow::from(vec![]),
             Self::Symbol { .. } => Cow::from(vec![]),
-            Self::Empty => Cow::from(vec![]),
+            Self::Empty | Self::Error => Cow::from(vec![]),
         }
     }
 }
 
 impl From<SyntaxBuilderError> for SyntaxNode {
     fn from(err: SyntaxBuilderError) -> Self {
-        Self::Constant {
-            node_type: NodeType::Error,
-            return_type: ReturnType::Error,
-            value: ConstantNodeValue::ErrorMessage(err.to_string()),
-        }
+        Self::Error
     }
 }

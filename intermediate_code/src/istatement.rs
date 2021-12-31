@@ -2,12 +2,13 @@ use syntax::{ReturnType, SymbolId};
 
 use crate::{
     ioperand::IOperand,
-    ioperator::{IOperator, IOperatorType},
+    ioperator::{IOperator, IOperatorSize},
 };
 use std::fmt;
 
+#[derive(Clone)]
 pub struct IStatement {
-    pub op_type: IOperatorType,
+    pub op_type: IOperatorSize,
     pub operator: IOperator,
     pub operand1: Option<IOperand>,
     pub operand2: Option<IOperand>,
@@ -17,7 +18,7 @@ pub struct IStatement {
 impl IStatement {
     pub fn make_label(label_id: SymbolId) -> Self {
         Self {
-            op_type: IOperatorType::Void,
+            op_type: IOperatorSize::Void,
             operator: IOperator::Label,
             operand1: Some(IOperand::Symbol {
                 id: label_id,
@@ -30,7 +31,7 @@ impl IStatement {
 
     pub fn make_goto(target_id: SymbolId) -> Self {
         Self {
-            op_type: IOperatorType::Void,
+            op_type: IOperatorSize::Void,
             operator: IOperator::Goto,
             operand1: Some(IOperand::Symbol {
                 id: target_id,
@@ -106,7 +107,7 @@ impl fmt::Display for IStatement {
             f,
             "{}{}{}",
             self.op_type,
-            if self.op_type == IOperatorType::Void {
+            if self.op_type == IOperatorSize::Void {
                 ""
             } else {
                 ":"

@@ -8,7 +8,7 @@ use crate::{
 use std::borrow::Borrow;
 use std::{collections::HashMap, fmt};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum SymbolScope {
     Local { owning_function: SymbolId },
     Global,
@@ -223,8 +223,15 @@ impl SymbolTable {
         )
     }
 
+    /// Return all the global symbols in the [SymbolTable].
     pub fn get_globals(&self) -> HashMap<SymbolId, Symbol> {
-        unimplemented!()
+        let mut hm = HashMap::new();
+        for (id, info) in &self.symbols {
+            if info.symbol_scope == SymbolScope::Global {
+                hm.insert(*id, info.symbol.clone());
+            }
+        }
+        hm
     }
 
     pub fn get_main_id(&self) -> SymbolId {

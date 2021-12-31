@@ -1,6 +1,6 @@
 use crate::icode::IntermediateCode;
 use crate::ioperand::IOperand;
-use crate::ioperator::{IOperator, IOperatorType};
+use crate::ioperator::{IOperator, IOperatorSize};
 use crate::istatement::IStatement;
 use syntax::{
     NodeType::{self, *},
@@ -168,7 +168,7 @@ impl<'a> IVisitor<'a> {
                     ret_type: ReturnType::Bool,
                 };
                 self.icode.append_statement(IStatement {
-                    op_type: IOperatorType::Byte,
+                    op_type: IOperatorSize::Byte,
                     operator: IOperator::Not,
                     operand1: Some(child_exp),
                     operand2: None,
@@ -214,7 +214,7 @@ impl<'a> IVisitor<'a> {
             ret_type: ReturnType::Void,
         };
         self.icode.append_statement(IStatement {
-            op_type: IOperatorType::Void,
+            op_type: IOperatorSize::Void,
             operator: IOperator::Func,
             operand1: Some(label_istmt),
             operand2: None,
@@ -273,7 +273,7 @@ impl<'a> IVisitor<'a> {
         let else_label = self.make_label();
         // Check condition, jump to else-label if condition was false
         self.icode.append_statement(IStatement {
-            op_type: IOperatorType::Void,
+            op_type: IOperatorSize::Void,
             operator: IOperator::Jz,
             operand1: Some(cond_expr),
             operand2: None,
@@ -316,7 +316,7 @@ impl<'a> IVisitor<'a> {
         let cond_expr = self.accept_expression(cond);
         // jump over while body if expression is false
         self.icode.append_statement(IStatement {
-            op_type: IOperatorType::Void,
+            op_type: IOperatorSize::Void,
             operator: IOperator::Jz,
             operand1: Some(cond_expr),
             operand2: None,
@@ -379,7 +379,7 @@ impl<'a> IVisitor<'a> {
     fn visit_return(&mut self, ret: Option<&SyntaxNode>) {
         let ret_exp = ret.map(|r| self.accept_expression(r));
         self.icode.append_statement(IStatement {
-            op_type: IOperatorType::Void,
+            op_type: IOperatorSize::Void,
             operator: IOperator::Return,
             operand1: ret_exp,
             operand2: None,
@@ -405,11 +405,11 @@ impl<'a> IVisitor<'a> {
     }
 
     fn calc_array_index(&mut self, base_type: ReturnType, access: &SyntaxNode) -> IOperand {
-        let type_size: usize = IOperatorType::from(base_type).into();
+        let type_size: usize = IOperatorSize::from(base_type).into();
         let acccess_exp = self.accept_expression(access);
         let access_with_offset = IOperand::from_symbol(self.make_temp(base_type), base_type);
         self.icode.append_statement(IStatement {
-            op_type: IOperatorType::Double,
+            op_type: IOperatorSize::Double,
             operator: IOperator::Mul,
             operand1: Some(IOperand::from(type_size)),
             operand2: Some(acccess_exp),

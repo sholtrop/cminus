@@ -1,0 +1,1 @@
+gcc -S -fno-asynchronous-unwind-tables "$@" -o test.asm

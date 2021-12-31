@@ -1,11 +1,18 @@
-use intermediate_code::ioperator::IOperatorType;
+use intermediate_code::ioperator::IOperatorSize;
 use std::fmt;
 
 pub struct Register {
     pub name: RegisterName,
-    pub optype: IOperatorType,
+    pub optype: IOperatorSize,
 }
 
+impl Register {
+    pub fn new(name: RegisterName, optype: IOperatorSize) -> Self {
+        Self { name, optype }
+    }
+}
+
+#[derive(Clone, Copy)]
 pub enum RegisterName {
     Invalid,
     Rax,
@@ -52,9 +59,9 @@ impl Register {
         match RegisterType::from(&self.name) {
             RegisterType::GeneralPurpose => "",
             RegisterType::SpecialPurpose => match self.optype {
-                IOperatorType::Byte | IOperatorType::Word => "",
-                IOperatorType::Double => "e",
-                IOperatorType::Quad => "r",
+                IOperatorSize::Byte | IOperatorSize::Word => "",
+                IOperatorSize::Double => "e",
+                IOperatorSize::Quad => "r",
                 _ => unreachable!(),
             },
         }
@@ -87,15 +94,15 @@ impl Register {
     fn get_end(&self) -> String {
         match RegisterType::from(&self.name) {
             RegisterType::GeneralPurpose => match self.optype {
-                IOperatorType::Byte => "b",
-                IOperatorType::Word => "w",
-                IOperatorType::Double => "d",
-                IOperatorType::Quad => "",
+                IOperatorSize::Byte => "b",
+                IOperatorSize::Word => "w",
+                IOperatorSize::Double => "d",
+                IOperatorSize::Quad => "",
                 _ => unreachable!(),
             },
             RegisterType::SpecialPurpose => match self.optype {
-                IOperatorType::Byte => "l",
-                IOperatorType::Void => unreachable!(),
+                IOperatorSize::Byte => "l",
+                IOperatorSize::Void => unreachable!(),
                 _ => "x",
             },
         }
@@ -107,7 +114,7 @@ impl fmt::Display for Register {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}{}{}",
+            "%{}{}{}",
             self.get_start(),
             self.get_middle(),
             self.get_end()

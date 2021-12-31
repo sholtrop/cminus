@@ -345,8 +345,13 @@ pub fn test_function(input: &str) -> Result<(), &str> {
         log::error!("{}", err);
         return Err("Error occurred");
     }
-    let SyntaxAnalysisResult { tree, errors, .. } = result.unwrap();
-    if !errors.is_empty() {
+    let SyntaxAnalysisResult {
+        tree,
+        errors,
+        warnings,
+        ..
+    } = result.unwrap();
+    if !errors.is_empty() || !warnings.is_empty() {
         return Err("Errors present");
     }
     for (id, func) in tree.functions {
@@ -374,9 +379,9 @@ pub fn run() -> io::Result<()> {
     };
     let unit_tests = collect_tests_in_path(UNIT_TEST_PATH)?.into_iter();
     let program_tests = collect_tests_in_path(PROGRAM_TEST_PATH)?.into_iter();
-    let lex_tests = collect_tests_in_path(SYNTAX_TEST_PATH)?.into_iter();
+    let syntax_tests = collect_tests_in_path(SYNTAX_TEST_PATH)?.into_iter();
 
-    for test in unit_tests.chain(program_tests).chain(lex_tests) {
+    for test in unit_tests.chain(program_tests).chain(syntax_tests) {
         stats.total += 1;
         if run_single_test(test, test_function).is_ok() {
             stats.success += 1;
