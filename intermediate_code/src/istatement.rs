@@ -1,4 +1,4 @@
-use syntax::{ReturnType, SymbolId};
+use syntax::{ReturnType, SymbolId, BUILTIN_IDS};
 
 use crate::{
     ioperand::IOperand,
@@ -76,6 +76,10 @@ impl IStatement {
         self.is_conditional_jump()
             || self.is_unconditional_jump()
             || self.operator == IOperator::Return
+    }
+
+    pub fn is_non_builtin_call(&self) -> bool {
+        self.is_call() && !BUILTIN_IDS.contains(&self.label_id().0)
     }
 
     pub fn is_call(&self) -> bool {

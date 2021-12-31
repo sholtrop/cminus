@@ -46,7 +46,7 @@ impl From<&IntermediateCode> for ICInfo {
                 let id = stmt.label_id();
                 info.funcs.insert(id, line);
                 current_func = Some(id);
-            } else if stmt.is_call() {
+            } else if stmt.is_non_builtin_call() {
                 let id = stmt.label_id();
                 info.add_call(id, line);
                 if statements.peek().is_some() {

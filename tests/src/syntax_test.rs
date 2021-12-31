@@ -387,26 +387,26 @@ pub fn run() -> io::Result<()> {
             stats.success += 1;
         }
     }
-    log::info!("[{} / {}] GENERAL TESTS PASSED", stats.success, stats.total);
-    stats.success = 0;
-    stats.total = 0;
     println!();
     log::info!("Running specific tests...");
-
+    let mut spec_stats = TestStats {
+        success: 0,
+        total: 0
+    };
     for test in specific_tests::ALL_TESTS {
-        stats.total += 1;
+        spec_stats.total += 1;
         if test() {
-            stats.success += 1;
+            spec_stats.success += 1;
             log::info!("↪    PASSED");
         } else {
             log::error!("↪    FAILED");
         }
     }
-
+    log::info!("[{} / {}] GENERAL TESTS PASSED", stats.success, stats.total);
     log::info!(
         "[{} / {}] SPECIFIC TESTS PASSED",
-        stats.success,
-        stats.total
+        spec_stats.success,
+        spec_stats.total
     );
     Ok(())
 }

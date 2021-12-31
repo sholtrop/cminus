@@ -258,9 +258,9 @@ impl FlowGraph {
             let leader_else = info.labels.get(&label).unwrap();
             let block = leaders.get(leader_else).unwrap();
             out.push(*block);
-        } else if last_stmt.is_call() {
-            log::trace!("call");
+        } else if last_stmt.is_non_builtin_call() {
             let func_id = last_stmt.label_id();
+            log::trace!("call {}", func_id);
             let line = info.funcs.get(&func_id).unwrap();
             let block = leaders.get(line).unwrap();
             out.push(*block);
@@ -294,7 +294,6 @@ impl FlowGraph {
         log::trace!("Returns: {:#?}", info.returns);
         for (id, calls) in &info.calls {
             if let Some(returns) = info.returns.get(id) {
-                // Requires complex scoping to keep the borrow checker happy
                 for call in calls {
                     let after_call_bid = *leader_to_block.get(&(*call + 1)).unwrap();
                     for ret in returns {
