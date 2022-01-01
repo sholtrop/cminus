@@ -5,7 +5,5 @@ void func(int idx) {
 }
 
 int main(void) {
-    large_array[8] = 42;
-    func(8);
-    return 0;
+    int x = 1;
 }
