@@ -1,5 +1,6 @@
 use crate::{
-    error::ICodeError, flow_graph::FlowGraph, icode::IntermediateCode, ivisitor::IVisitor,
+    error::ICodeError, flow_graph::FlowGraph, ic_info::ICLineNumber, icode::IntermediateCode,
+    ivisitor::IVisitor,
 };
 use std::fmt;
 use syntax::{SymbolTable, SyntaxTree};
@@ -23,10 +24,9 @@ pub fn generate(
     table: &mut SymbolTable,
     opt_level: OptLevel,
 ) -> Result<Intermediate, ICodeError> {
-    match opt_level {
-        OptLevel::Pre | OptLevel::Both => preprocess(tree, table),
-        _ => {}
-    };
+    if matches!(opt_level, OptLevel::Pre | OptLevel::Post) {
+        preprocess(tree, table)
+    }
 
     let func_ids = table.get_function_ids();
     let mut visitor = IVisitor::new(table);
@@ -37,11 +37,15 @@ pub fn generate(
         visitor.visit_function(func, id);
     }
     let mut icode = visitor.result();
-    match opt_level {
-        OptLevel::Post | OptLevel::Both => postprocess(&mut icode, table),
-        _ => {}
-    };
+    if matches!(opt_level, OptLevel::Post | OptLevel::Both) {
+        postprocess(&mut icode, table);
+    }
     let graph = FlowGraph::new(table, &icode);
+    for (l, _) in (&icode).into_iter() {
+        log::trace!("{}. is reachable: {}", l, graph.is_reachable(&l));
+    }
+    log::trace!("Live at 3:\n{:#?}", graph.get_live_at(&ICLineNumber(3)));
+
     Ok(Intermediate { icode, graph })
 }
 

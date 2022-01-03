@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeSet, HashMap},
+    fmt,
     ops::{Add, Sub},
 };
 use syntax::SymbolId;
@@ -62,8 +63,6 @@ impl From<&IntermediateCode> for ICInfo {
         info
     }
 }
-
-use std::fmt;
 
 use crate::icode::IntermediateCode;
 

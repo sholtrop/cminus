@@ -100,20 +100,34 @@ impl FlowGraph {
         self.graph.get(self.entry).unwrap()
     }
 
-    pub fn is_reachable(&self, line: ICLineNumber) -> bool {
-        todo!()
+    pub fn is_reachable(&self, line: &ICLineNumber) -> bool {
+        let block = self.block_map.get(line).unwrap();
+        self.reachable.contains(block)
     }
 
-    pub fn is_live_at(&self, line: ICLineNumber, sym: SymbolId) -> bool {
-        todo!()
+    pub fn is_live_at(&self, line: &ICLineNumber, sym: &SymbolId) -> bool {
+        match self.liveness.live_out.get(line) {
+            Some(live) => live.contains(sym),
+            None => false,
+        }
     }
 
-    pub fn get_live_at(&self, line: ICLineNumber) -> HashSet<SymbolId> {
-        todo!()
+    pub fn get_live_at(&self, line: &ICLineNumber) -> HashSet<SymbolId> {
+        let mut live = match self.liveness.live_out.get(line) {
+            Some(l) => l.clone(),
+            None => HashSet::new(),
+        };
+        if let Some(l) = self.liveness.live_in.get(line) {
+            live.extend(l.iter())
+        }
+        live
     }
 
-    pub fn get_live_out_at(&self, line: ICLineNumber) -> HashSet<SymbolId> {
-        todo!()
+    pub fn get_live_out_at(&self, line: &ICLineNumber) -> HashSet<SymbolId> {
+        match self.liveness.live_out.get(line) {
+            Some(l) => l.clone(),
+            None => HashSet::new(),
+        }
     }
 
     /// Returns a three-tuple of the entry to the graph, the graph itself and the blockmap
@@ -144,14 +158,16 @@ impl FlowGraph {
             prev_leader = curr_leader;
         }
         {
-            let last = graph.alloc(BasicBlock::new(
-                *prev_leader,
-                (icode.n_statements() - 1).into(),
-            ));
+            let last_line = (icode.n_statements() - 1).into();
+            let last = graph.alloc(BasicBlock::new(*prev_leader, last_line));
             leader_to_block.insert(*prev_leader, last);
             if FlowGraph::line_is_main(table, prev_leader, icode) {
                 entry = Some(last);
                 graph.get_mut(last).unwrap().is_entry = true;
+            }
+            for line in prev_leader.0..(last_line + 1).0 {
+                log::trace!("line: {}", line);
+                block_map.insert(ICLineNumber(line), last);
             }
         }
         for block_id in leader_to_block.values() {
@@ -191,7 +207,7 @@ impl FlowGraph {
             .get_statements(block.start, block.end)
             .iter()
             .zip(block.start.0..block.end.0)
-            .map(|(_, y)| ICLineNumber(y))
+            .map(|(_, ln)| ICLineNumber(ln))
             .rev()
             .collect();
 
@@ -229,9 +245,6 @@ impl FlowGraph {
         let mut liveness = Liveness::default();
         let globals = table.get_globals().keys().copied().collect_vec();
         for (l, stmt) in icode {
-            if stmt.operator == IOperator::Label {
-                continue;
-            }
             let mut def = HashSet::new();
             if stmt.operator == IOperator::Assign {
                 log::trace!("{}", stmt);

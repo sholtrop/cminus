@@ -1,9 +1,12 @@
-int large_array[100];
-
-void func(int idx) {
-    writeinteger(large_array[idx]);
-}
-
-int main(void) {
-    int x = 1;
+int main(void)
+{
+    if (1)
+    {
+        return 1;
+    }
+    else
+    {
+        return 2;
+    }
+    return 0;
 }
