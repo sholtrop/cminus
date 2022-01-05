@@ -1,9 +1,12 @@
+use intermediate_code::ioperand::IOperand;
 use intermediate_code::{flow_graph::FlowGraph, icode::IntermediateCode};
 use syntax::SymbolTable;
 
+use crate::assembly::asm::Src;
 use crate::emitter::CodeEmitter;
 use crate::global_alloc::GlobalsAllocator;
 use crate::output::{self, OutStream};
+use intermediate_code::ioperator::IOperator::*;
 
 pub struct CodeGenerator<'a> {
     out: OutStream,
@@ -38,11 +41,26 @@ impl<'a> CodeGenerator<'a> {
         graph: &FlowGraph,
     ) {
         let emitter = CodeEmitter::new(self.out.clone(), &self.globals, table);
-        for (line, stmt) in icode {}
+        for (line, stmt) in icode {
+            log::trace!("{}. {}", line, stmt);
+            match stmt.operator {
+                Func => emitter.emit_func(&stmt.label_id()),
+                FuncCall => emitter.emit_call(&stmt.label_id(), &stmt.ret_target),
+                Return => {
+                    let src = match stmt.operand1 {
+                        Some(IOperand::Immediate { value, .. }) => Src::Immediate(value),
+                        None => Src::None,
+                        _ => todo!("Implement non-immediate types of return values"),
+                    };
+                    emitter.emit_return(src);
+                }
+                _ => todo!("{}", stmt),
+            }
+        }
     }
 
     pub fn generate_trailer(&self) {
-        self.write(concat!(
+        self.write(&concat!(
             ".LC0:\n",
             "\t.string \"%d\"\n",
             "\t.globl readinteger\n",
@@ -94,7 +112,7 @@ impl<'a> CodeGenerator<'a> {
         ));
     }
 
-    fn write(&self, contents: impl ToString) {
+    fn write(&self, contents: &impl ToString) {
         output::write(self.out.clone(), contents);
     }
 }

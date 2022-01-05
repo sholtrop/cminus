@@ -17,7 +17,19 @@ pub struct Intermediate {
     pub graph: FlowGraph,
 }
 
-fn preprocess(tree: &SyntaxTree, table: &mut SymbolTable) {}
+fn preprocess(tree: &SyntaxTree, table: &mut SymbolTable) {
+    // TODO:
+    // - Constant folding
+    // - Dead code elimination
+    //
+}
+
+fn postprocess(icode: &mut IntermediateCode, table: &mut SymbolTable) {
+    // TODO:
+    //  - consolidate returns
+    //    Don't copy return code but jump to a single return at the end where applicable
+    //
+}
 
 pub fn generate(
     tree: &SyntaxTree,
@@ -44,16 +56,12 @@ pub fn generate(
     for (l, _) in (&icode).into_iter() {
         log::trace!("{}. is reachable: {}", l, graph.is_reachable(&l));
     }
-    log::trace!("Live at 3:\n{:#?}", graph.get_live_at(&ICLineNumber(3)));
 
     Ok(Intermediate { icode, graph })
 }
 
-fn postprocess(icode: &mut IntermediateCode, table: &mut SymbolTable) {}
-
 impl fmt::Display for Intermediate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "Flow graph - Not implemented yet")?;
         writeln!(f, "#### Intermediate code ####")?;
         writeln!(f, "{}", self.icode)
     }

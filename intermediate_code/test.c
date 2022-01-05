@@ -1,12 +1,4 @@
-int main(void)
+int8_t main(void)
 {
-    if (1)
-    {
-        return 1;
-    }
-    else
-    {
-        return 2;
-    }
-    return 0;
+    return 1;
 }

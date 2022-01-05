@@ -6,6 +6,7 @@ pub mod asm {
         Push(IOperatorSize),
         Pop(IOperatorSize),
         Ret,
+        Call,
     }
 
     impl fmt::Display for Op {
@@ -17,6 +18,7 @@ pub mod asm {
                     Mov(s) => format!("mov{}", s),
                     Push(s) => format!("push{}", s),
                     Pop(s) => format!("pop{}", s),
+                    Call => "call".into(),
                     Ret => "ret".into(),
                 }
             )
@@ -30,11 +32,13 @@ pub mod asm {
 
     use self::Op::*;
 
+    #[derive(Clone)]
     pub enum Src {
         None,
         Immediate(ConstantNodeValue),
         Register(Register),
         Global(SymbolId),
+        Label(String),
     }
 
     impl From<Register> for Src {
@@ -53,6 +57,7 @@ pub mod asm {
                     Self::Global(id) => format!("v{}(%rip)", id),
                     Self::Immediate(i) => format!("${}", i),
                     Self::Register(r) => r.to_string(),
+                    Self::Label(l) => l.to_string(),
                 }
             )
         }
@@ -63,6 +68,7 @@ pub mod asm {
         Register(Register),
         MemAddress(String),
         Global(String),
+        Label(String),
     }
 
     impl From<Register> for Dest {
@@ -81,6 +87,7 @@ pub mod asm {
                     Self::Register(r) => r.to_string(),
                     Self::Global(s) => format!("v{}(%rip)", s),
                     Self::MemAddress(m) => m.to_string(),
+                    Self::Label(l) => l.to_string(),
                 }
             )
         }
@@ -95,12 +102,10 @@ pub mod asm {
     impl fmt::Display for Instr {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let Self(op, src, dst) = self;
-            let size = "q"; // TODO: correct size
             writeln!(
                 f,
-                "\t{}{}{}{}",
+                "\t{}{}{}",
                 op,
-                size,
                 match src {
                     Src::None => "".into(),
                     _ => format!("\t{}", self.1),
@@ -116,8 +121,8 @@ pub mod asm {
     pub struct Label(pub String);
 
     impl Label {
-        pub fn new(s: impl AsRef<str>) -> Self {
-            Self(s.as_ref().to_string())
+        pub fn new(name: impl ToString) -> Self {
+            Self(name.to_string())
         }
     }
 
@@ -143,13 +148,13 @@ pub mod asm {
                 format!(
                     "\t.{}\n",
                     match self {
-                        Directive::File(s) => format!(".file\t{}", s),
-                        Directive::Def(s) => format!(".def\t{}", s),
-                        Directive::Text => ".text".into(),
-                        Directive::Ascii(s) => format!(".ascii\t{}", s),
-                        Directive::Global(s) => format!(".globl\t{}", s),
+                        Directive::File(s) => format!("file\t{}", s),
+                        Directive::Def(s) => format!("def\t{}", s),
+                        Directive::Text => "text".into(),
+                        Directive::Ascii(s) => format!("ascii\t{}", s),
+                        Directive::Global(s) => format!("globl\t{}", s),
                         Directive::Comm { name, size } =>
-                            format!(".comm\tv{}, {}", name, usize::from(*size).to_string()),
+                            format!("comm\tv{}, {}", name, usize::from(*size).to_string()),
                     }
                 )
             )

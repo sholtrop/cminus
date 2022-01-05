@@ -1,1 +1,1 @@
-gcc -S -fno-asynchronous-unwind-tables "$@" -o test.asm
+gcc -S -fno-asynchronous-unwind-tables -no-pie test.c -o test.S

@@ -108,7 +108,19 @@ impl Register {
             RegisterType::SpecialPurpose => match self.optype {
                 IOperatorSize::Byte => "l",
                 IOperatorSize::Void => unreachable!(),
-                _ => "x",
+                _ => {
+                    if matches!(
+                        self.name,
+                        RegisterName::Rsi
+                            | RegisterName::Rdi
+                            | RegisterName::Rbp
+                            | RegisterName::Rsp
+                    ) {
+                        ""
+                    } else {
+                        "x"
+                    }
+                }
             },
         }
         .to_string()

@@ -30,7 +30,7 @@ impl<'a> GlobalsAllocator<'a> {
         todo!("Register allocation");
         let optype = self.table.get_symbol(id).unwrap().return_type.into();
         let reg = Register::new(*dest, optype);
-        self.write(Instr(
+        self.write(&instr(
             Op::Mov(optype),
             Src::Global(*id),
             Dest::Register(reg),
@@ -45,7 +45,7 @@ impl<'a> GlobalsAllocator<'a> {
         todo!("Register allocation");
         let optype = self.table.get_symbol(id).unwrap().return_type.into();
         let reg = Register::new(*src, optype);
-        self.write(Instr(
+        self.write(&instr(
             Op::Mov(optype),
             Src::Register(reg),
             Dest::Global(id.to_string()),
@@ -56,13 +56,13 @@ impl<'a> GlobalsAllocator<'a> {
         if self.globals.is_empty() {
             return;
         }
-        self.write(Label::new("LCX"));
+        self.write(&Label::new("LCX"));
         for (id, optype) in &self.globals {
             let symbol = self.table.get_symbol(id).unwrap();
             if symbol.is_array() {
                 todo!("Implement array globals")
             } else {
-                self.write(Directive::Comm {
+                self.write(&Directive::Comm {
                     name: id.to_string(),
                     size: *optype,
                 });
@@ -70,7 +70,7 @@ impl<'a> GlobalsAllocator<'a> {
         }
     }
 
-    fn write(&self, contents: impl ToString) {
+    fn write(&self, contents: &impl ToString) {
         output::write(self.out.clone(), contents);
     }
 }

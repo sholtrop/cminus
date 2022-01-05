@@ -1,5 +1,6 @@
 use std::fmt;
 
+use syntax::ConstantNodeValue;
 use syntax::NodeType;
 use syntax::ReturnType;
 
@@ -40,6 +41,17 @@ impl From<ReturnType> for IOperatorSize {
             | ReturnType::UintArray
             | ReturnType::IntArray => Self::Quad,
             _ => unreachable!("Cannot convert {} to IOperatorType", rt),
+        }
+    }
+}
+
+impl From<ConstantNodeValue> for IOperatorSize {
+    fn from(val: ConstantNodeValue) -> Self {
+        match val {
+            ConstantNodeValue::Int8(_) => IOperatorSize::Byte,
+            ConstantNodeValue::Int(_) => IOperatorSize::Word,
+            ConstantNodeValue::Uint(_) => IOperatorSize::Word,
+            ConstantNodeValue::Uint8(_) => IOperatorSize::Byte,
         }
     }
 }

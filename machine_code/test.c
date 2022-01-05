@@ -1,9 +1,4 @@
-int givenum()
+int8_t main(void)
 {
-    return 2;
-}
-
-int main(void)
-{
-    return givenum();
+    return 1;
 }

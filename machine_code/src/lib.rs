@@ -36,7 +36,7 @@ pub fn compile_file(input_path: &str, output_path: Option<&str>) -> Result<(), S
         std::fs::File::create(path).unwrap()
     } else {
         let path = input_path.split('.').next().unwrap();
-        std::fs::File::create(format!("{}.asm", path)).unwrap()
+        std::fs::File::create(format!("{}.S", path)).unwrap()
     };
     let out = Rc::new(RefCell::new(out)) as OutStream;
     generate(&intermediate, &symbol_table, out);
