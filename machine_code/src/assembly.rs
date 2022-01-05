@@ -3,6 +3,9 @@ pub mod asm {
 
     pub enum Op {
         Mov(IOperatorSize),
+        Push(IOperatorSize),
+        Pop(IOperatorSize),
+        Ret,
     }
 
     impl fmt::Display for Op {
@@ -12,6 +15,9 @@ pub mod asm {
                 "{}",
                 match self {
                     Mov(s) => format!("mov{}", s),
+                    Push(s) => format!("push{}", s),
+                    Pop(s) => format!("pop{}", s),
+                    Ret => "ret".into(),
                 }
             )
         }
@@ -29,6 +35,12 @@ pub mod asm {
         Immediate(ConstantNodeValue),
         Register(Register),
         Global(SymbolId),
+    }
+
+    impl From<Register> for Src {
+        fn from(reg: Register) -> Self {
+            Self::Register(reg)
+        }
     }
 
     impl fmt::Display for Src {
@@ -53,6 +65,12 @@ pub mod asm {
         Global(String),
     }
 
+    impl From<Register> for Dest {
+        fn from(reg: Register) -> Self {
+            Self::Register(reg)
+        }
+    }
+
     impl fmt::Display for Dest {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(
@@ -69,6 +87,11 @@ pub mod asm {
     }
 
     pub struct Instr(pub Op, pub Src, pub Dest);
+
+    pub fn instr(op: impl Into<Op>, src: impl Into<Src>, dst: impl Into<Dest>) -> Instr {
+        Instr(op.into(), src.into(), dst.into())
+    }
+
     impl fmt::Display for Instr {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             let Self(op, src, dst) = self;

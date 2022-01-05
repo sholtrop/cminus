@@ -3,7 +3,6 @@ use crate::{
     icode::IntermediateCode,
     ioperand::IOperand,
     ioperator::IOperator,
-    istatement::IStatement,
 };
 use id_arena::Arena;
 use itertools::Itertools;
@@ -290,7 +289,6 @@ impl FlowGraph {
         let last_stmt = icode.get_statement(block.end);
         if last_stmt.is_unconditional_jump() {
             let label = last_stmt.label_id();
-            log::trace!("uncond - labelid: {}", label);
             let leader = info.labels.get(&label).unwrap();
             let block = leaders.get(leader).unwrap();
             out.push(*block);
@@ -299,13 +297,11 @@ impl FlowGraph {
             let block = leaders.get(&leader_if).unwrap();
             out.push(*block);
             let label = last_stmt.label_id();
-            log::trace!("cond - labelid: {}", label);
             let leader_else = info.labels.get(&label).unwrap();
             let block = leaders.get(leader_else).unwrap();
             out.push(*block);
         } else if last_stmt.is_non_builtin_call() {
             let func_id = last_stmt.label_id();
-            log::trace!("call {}", func_id);
             let line = info.funcs.get(&func_id).unwrap();
             let block = leaders.get(line).unwrap();
             out.push(*block);

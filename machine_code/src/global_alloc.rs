@@ -27,6 +27,7 @@ impl<'a> GlobalsAllocator<'a> {
     }
 
     pub fn load(&self, id: &SymbolId, dest: &RegisterName) {
+        todo!("Register allocation");
         let optype = self.table.get_symbol(id).unwrap().return_type.into();
         let reg = Register::new(*dest, optype);
         self.write(Instr(
@@ -37,10 +38,11 @@ impl<'a> GlobalsAllocator<'a> {
     }
 
     pub fn load_array(&self, id: &SymbolId, dest: &RegisterName) {
-        todo!()
+        todo!("Register allocation")
     }
 
     pub fn store(&self, src: &RegisterName, id: &SymbolId) {
+        todo!("Register allocation");
         let optype = self.table.get_symbol(id).unwrap().return_type.into();
         let reg = Register::new(*src, optype);
         self.write(Instr(

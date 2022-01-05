@@ -8,11 +8,12 @@ use intermediate_code::ic_generator::OptLevel;
 use syntax::SymbolTable;
 use syntax::SyntaxAnalysisResult;
 
-pub mod allocator;
 pub mod assembly;
 pub mod code_generator;
 pub mod emitter;
+pub mod global_alloc;
 pub mod output;
+pub mod reg_alloc;
 pub mod register;
 
 pub fn compile_file(input_path: &str, output_path: Option<&str>) -> Result<(), String> {

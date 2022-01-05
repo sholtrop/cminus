@@ -1,6 +1,7 @@
 use intermediate_code::ioperator::IOperatorSize;
 use std::fmt;
 
+#[derive(Clone, Copy)]
 pub struct Register {
     pub name: RegisterName,
     pub optype: IOperatorSize,
@@ -10,6 +11,10 @@ impl Register {
     pub fn new(name: RegisterName, optype: IOperatorSize) -> Self {
         Self { name, optype }
     }
+}
+
+pub fn reg(name: RegisterName, optype: IOperatorSize) -> Register {
+    Register::new(name, optype)
 }
 
 #[derive(Clone, Copy)]

@@ -1,5 +1,9 @@
+int givenum()
+{
+    return 2;
+}
 
 int main(void)
 {
-    return 0;
+    return givenum();
 }

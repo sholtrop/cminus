@@ -1,8 +1,8 @@
 use intermediate_code::{flow_graph::FlowGraph, icode::IntermediateCode};
 use syntax::SymbolTable;
 
-use crate::allocator::GlobalsAllocator;
 use crate::emitter::CodeEmitter;
+use crate::global_alloc::GlobalsAllocator;
 use crate::output::{self, OutStream};
 
 pub struct CodeGenerator<'a> {
