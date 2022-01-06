@@ -17,9 +17,8 @@ pub fn reg(name: RegisterName, optype: IOperatorSize) -> Register {
     Register::new(name, optype)
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RegisterName {
-    Invalid,
     Rax,
     Rbx,
     Rcx,
@@ -36,6 +35,7 @@ pub enum RegisterName {
     R13,
     R14,
     R15,
+    Invalid,
 }
 
 pub enum RegisterType {
