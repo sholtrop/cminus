@@ -46,7 +46,7 @@ impl<'a> RegisterAllocator<'a> {
         self.current_line = line;
     }
 
-    pub fn get_register(&mut self, line: &ICLineNumber, op: &IStatement) -> [Option<Register>; 3] {
+    pub fn get_register(&mut self, op: &IStatement) -> [Option<Register>; 3] {
         match op.operator {
             Param => {
                 let param_id = op.operand1.as_ref().unwrap().id();
@@ -60,7 +60,10 @@ impl<'a> RegisterAllocator<'a> {
                     todo!("Stack allocation of params");
                 }
             }
-            _ => [None, None, None],
+            _ => {
+                // TODO: Find out which symbols need registers, allocate them
+                [None, None, None]
+            }
         }
     }
 
