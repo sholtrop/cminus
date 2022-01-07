@@ -82,13 +82,12 @@ impl<'a> CodeEmitter<'a> {
     }
 
     pub fn emit_return(&self, src: Src) {
-        log::trace!("{}", src);
         let size = match src {
             Src::Immediate(v) => Some(v.into()),
             Src::Register(r) => Some(r.optype),
             Src::Global(g) => todo!("Globals for return"),
             Src::None => None,
-            _ => panic!("Invalid source for return: {}", src),
+            _ => unreachable!("Invalid source for return: {}", src),
         };
         if let Some(size) = size {
             let rax = reg(Rax, size);

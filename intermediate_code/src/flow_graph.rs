@@ -85,7 +85,6 @@ impl FlowGraph {
         let (entry, graph, block_map) = FlowGraph::build_graph(icode, table, &info);
         let reachable = FlowGraph::determine_reachable(entry, &graph);
         let liveness = FlowGraph::compute_liveness(icode, table, &graph);
-        log::trace!("{:#?}", liveness);
         Self {
             graph,
             entry,
@@ -111,6 +110,7 @@ impl FlowGraph {
         }
     }
 
+    /// Get all variables which are live at given line
     pub fn get_live_at(&self, line: &ICLineNumber) -> HashSet<SymbolId> {
         let mut live = match self.liveness.live_out.get(line) {
             Some(l) => l.clone(),
@@ -122,6 +122,7 @@ impl FlowGraph {
         live
     }
 
+    /// Get all variables which are live after the given line
     pub fn get_live_out_at(&self, line: &ICLineNumber) -> HashSet<SymbolId> {
         match self.liveness.live_out.get(line) {
             Some(l) => l.clone(),

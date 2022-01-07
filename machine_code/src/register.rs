@@ -17,6 +17,7 @@ pub fn reg(name: RegisterName, optype: IOperatorSize) -> Register {
     Register::new(name, optype)
 }
 
+/// Uniquely identifies an x86 register by its 64-bit name.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RegisterName {
     Rax,
