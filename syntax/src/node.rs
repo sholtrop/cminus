@@ -5,7 +5,7 @@ use std::{borrow::Cow, ops::Deref};
 use lazy_static::lazy_static;
 
 lazy_static! {
-    pub static ref TESTING: bool = std::env::var("TESTING").is_ok();
+    pub static ref TESTING: bool = std::env::var("TESTING").map_or(false, |s| s != "0");
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -134,6 +134,31 @@ pub enum ConstantNodeValue {
     Uint(u32),
 }
 
+impl std::ops::Add for ConstantNodeValue {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (ConstantNodeValue::Int(x), ConstantNodeValue::Int(y)) => ConstantNodeValue::Int(x + y),
+            (ConstantNodeValue::Uint(x), ConstantNodeValue::Uint(y)) => {
+                ConstantNodeValue::Uint(x + y)
+            }
+
+            (ConstantNodeValue::Int8(x), ConstantNodeValue::Int8(y)) => {
+                ConstantNodeValue::Int8(x + y)
+            }
+
+            (ConstantNodeValue::Uint8(x), ConstantNodeValue::Uint8(y)) => {
+                ConstantNodeValue::Uint8(x + y)
+            }
+            _ => unreachable!(
+                "Cannot add two different ConstantNodeValue types: {:?} and {:?}",
+                self, rhs
+            ),
+        }
+    }
+}
+
 impl fmt::Display for ConstantNodeValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -233,7 +258,7 @@ pub enum SyntaxNode {
 }
 
 impl SyntaxNode {
-    pub fn create_error(err: impl ToString) -> Self {
+    pub fn create_error() -> Self {
         SyntaxNode::Error
     }
 
@@ -248,7 +273,8 @@ impl SyntaxNode {
         if from_ret_t == to {
             Ok(from)
         }
-        // ReturnTypes have a defined partial ordering for coercion
+        // ReturnTypes have a defined partial ordering for coercion.
+        // Any type can be coerced to bool or error.
         else if matches!(to, ReturnType::Bool | ReturnType::Error) || from_ret_t < to {
             Ok(SyntaxNode::Unary {
                 child: Some(Box::new(from)),

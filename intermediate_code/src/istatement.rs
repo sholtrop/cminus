@@ -103,6 +103,29 @@ impl IStatement {
             unreachable!()
         }
     }
+
+    pub fn is_assign(&self) -> bool {
+        self.operator == IOperator::Assign
+    }
+
+    pub fn is_binop(&self) -> bool {
+        matches!(
+            self.operator,
+            IOperator::Add
+                | IOperator::And
+                | IOperator::Div
+                | IOperator::Mul
+                | IOperator::Or
+                | IOperator::Sub
+                | IOperator::Mod
+                | IOperator::IDiv
+                | IOperator::Imod
+        )
+    }
+
+    pub fn is_param(&self) -> bool {
+        self.operator == IOperator::Param
+    }
 }
 
 impl fmt::Display for IStatement {

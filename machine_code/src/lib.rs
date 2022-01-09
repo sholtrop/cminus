@@ -11,7 +11,6 @@ use syntax::SyntaxAnalysisResult;
 pub mod assembly;
 pub mod code_generator;
 pub mod emitter;
-pub mod global_alloc;
 pub mod output;
 pub mod reg_alloc;
 pub mod register;
@@ -44,10 +43,9 @@ pub fn compile_file(input_path: &str, output_path: Option<&str>) -> Result<(), S
 }
 
 pub fn generate(intermediate: &Intermediate, table: &SymbolTable, out: OutStream) {
-    let mut cg = CodeGenerator::new(out, table);
-    let Intermediate { graph, icode } = intermediate;
+    let mut cg = CodeGenerator::new(out, table, &intermediate.graph, &intermediate.icode);
     cg.generate_header();
-    cg.generate_global_decls(table);
-    cg.generate_code(table, icode, graph);
+    cg.generate_global_decls();
+    cg.generate_code();
     cg.generate_trailer();
 }

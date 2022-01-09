@@ -1,7 +1,6 @@
 pub mod assembly;
 pub mod code_generator;
 pub mod emitter;
-pub mod global_alloc;
 pub mod output;
 pub mod reg_alloc;
 pub mod register;

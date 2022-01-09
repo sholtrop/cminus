@@ -28,7 +28,7 @@ pub enum ParserValue {
 
 impl From<SyntaxBuilderError> for ParserValue {
     fn from(e: SyntaxBuilderError) -> Self {
-        Self::Node(SyntaxNode::create_error(e.to_string()))
+        Self::Node(SyntaxNode::create_error())
     }
 }
 
@@ -229,7 +229,7 @@ impl TreeWalker {
                         };
                     }
                 }
-                ParserValue::Node(SyntaxNode::create_error("Missing array ident or size"))
+                ParserValue::Node(SyntaxNode::create_error())
             }
             Rule::formal_parameters => {
                 let mut nodes = parse_node.into_inner();

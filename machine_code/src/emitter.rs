@@ -2,31 +2,41 @@ use intermediate_code::{
     ic_info::ICLineNumber,
     ioperand::IOperand,
     ioperator::IOperatorSize::{self, *},
+    istatement::IStatement,
 };
 use syntax::{SymbolId, SymbolTable, SymbolType};
 
 use crate::{
     assembly::asm::*,
-    global_alloc::GlobalsAllocator,
     output::{self, OutStream},
+    reg_alloc::{RegAlloc, RW},
     register::{reg, RegisterName::*},
 };
 
 pub struct CodeEmitter<'a> {
     out: OutStream,
-    globals: &'a GlobalsAllocator<'a>,
+    reg_alloc: RegAlloc<'a>,
     table: &'a SymbolTable,
     line: ICLineNumber,
 }
 
 impl<'a> CodeEmitter<'a> {
-    pub fn new(out: OutStream, globals: &'a GlobalsAllocator<'a>, table: &'a SymbolTable) -> Self {
+    pub fn new(out: OutStream, reg_alloc: RegAlloc<'a>, table: &'a SymbolTable) -> Self {
         CodeEmitter {
             out,
-            globals,
+            reg_alloc,
             table,
             line: ICLineNumber(1),
         }
+    }
+
+    pub fn set_line(&mut self, line: ICLineNumber) {
+        self.line = line;
+        self.reg_alloc.set_line(line);
+    }
+
+    pub fn emit_global_decls(&mut self) {
+        self.reg_alloc.generate_data_segment();
     }
 
     pub fn emit_store(&self, dst: &SymbolId, src: &IOperand) {
@@ -44,6 +54,8 @@ impl<'a> CodeEmitter<'a> {
         let dst = Dest::Register(reg(Rbx, size));
         self.write(&instr(op, src, dst));
     }
+
+    pub fn emit_load(&mut self, dst: &SymbolId, src: &IOperand) {}
 
     pub fn emit_label(&self, id: &SymbolId) {
         let label = match self.table.get_symbol(id) {
@@ -73,7 +85,7 @@ impl<'a> CodeEmitter<'a> {
         self.write(&save_stack_p);
     }
 
-    // Emits a function epilogue
+    /// Emits a function epilogue
     pub fn emit_epilogue(&self) {
         let rbp = reg(Rbp, Quad);
         let pop_rbp = instr(Op::Pop(Quad), rbp, Dest::None);
@@ -81,7 +93,14 @@ impl<'a> CodeEmitter<'a> {
         self.write(&instr(Op::Ret, Src::None, Dest::None));
     }
 
-    pub fn emit_return(&self, src: Src) {
+    pub fn emit_return(&mut self, retval: Option<&IOperand>) {
+        let src = match retval {
+            Some(IOperand::Immediate { value, .. }) => Src::Immediate(*value),
+            None => Src::None,
+            Some(IOperand::Symbol { id, .. }) => self.reg_alloc.alloc_single(id, RW::Read).into(),
+            _ => unreachable!(),
+        };
+
         let size = match src {
             Src::Immediate(v) => Some(v.into()),
             Src::Register(r) => Some(r.optype),
@@ -94,6 +113,7 @@ impl<'a> CodeEmitter<'a> {
             let instr = instr(Op::Mov(size), src, rax);
             self.write(&instr);
         }
+        // Every function has an implicit return and will therefore have an epilogue
         self.emit_epilogue();
     }
 
@@ -102,6 +122,45 @@ impl<'a> CodeEmitter<'a> {
         let func_name = self.table.get_symbol(id).unwrap().name.clone();
         self.write(&instr(Op::Call, Src::Label(func_name.0), Dest::None));
         // TODO: return value is in %rax and may need to be moved somewhere else
+    }
+
+    pub fn emit_cast(&self, src: &SymbolId, dest: &SymbolId) {
+        let src_type = self.table.get_symbol(src).unwrap().return_type;
+        let dest_type = self.table.get_symbol(dest).unwrap().return_type;
+
+        // let instr = match dest_type {
+        //     Bool => {
+        //         instr(Op::Setnz, src, Dest::)
+        //     }
+        // }
+    }
+
+    pub fn emit_add(&mut self, lhs: &IOperand, rhs: &IOperand, ret: &SymbolId) {
+        let size = lhs.ret_type().into();
+        let lhs = match *lhs {
+            IOperand::Immediate { value, .. } => Src::Immediate(value),
+            IOperand::Symbol { id, .. } => self.reg_alloc.alloc_single(&id, RW::Read).into(),
+            IOperand::Unknown => unreachable!(),
+        };
+        let rhs = match *rhs {
+            IOperand::Immediate { value, .. } => Src::Immediate(value),
+            IOperand::Symbol { id, .. } => self.reg_alloc.alloc_single(&id, RW::Read).into(),
+            IOperand::Unknown => unreachable!(),
+        };
+        let ret = self.reg_alloc.alloc_single(ret, RW::Write);
+
+        // Two immediates do not need a temp
+        if let Src::Immediate(x) = lhs {
+            if let Src::Immediate(y) = rhs {
+                let instr = instr(Op::Mov(size), Src::Immediate(x + y), &ret);
+                self.write(&instr);
+            }
+        } else {
+            let instr1 = instr(Op::Add(size), lhs, &ret);
+            let instr2 = instr(Op::Add(size), rhs, &ret);
+            self.write(&instr1);
+            self.write(&instr2);
+        };
     }
 
     fn write(&self, contents: &impl ToString) {

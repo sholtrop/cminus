@@ -4,7 +4,7 @@ use syntax::ConstantNodeValue;
 use syntax::NodeType;
 use syntax::ReturnType;
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub enum IOperatorSize {
     Void,
     Byte,

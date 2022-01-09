@@ -45,7 +45,7 @@ impl PartialOrd for ReturnType {
     /// INT8      UINT8, INT, UINT, BOOL
     /// BOOL      INT8, UINT8, INT, UINT
     /// ```
-    /// If `a` < `b` then `a` can be coerced to `b`
+    /// If `a < b` then `a` can be coerced to `b`
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let order_left: usize = self.into();
         let order_right: usize = other.into();

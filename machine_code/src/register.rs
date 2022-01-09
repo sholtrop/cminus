@@ -1,7 +1,7 @@
 use intermediate_code::ioperator::IOperatorSize;
 use std::fmt;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Register {
     pub name: RegisterName,
     pub optype: IOperatorSize,
@@ -18,25 +18,25 @@ pub fn reg(name: RegisterName, optype: IOperatorSize) -> Register {
 }
 
 /// Uniquely identifies an x86 register by its 64-bit name.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum RegisterName {
-    Rax,
-    Rbx,
-    Rcx,
-    Rdx,
-    Rsi,
-    Rdi,
-    Rbp,
-    Rsp,
-    R8,
-    R9,
-    R10,
-    R11,
-    R12,
-    R13,
-    R14,
-    R15,
     Invalid,
+    R15,
+    R14,
+    R13,
+    R12,
+    R11,
+    R10,
+    R9,
+    R8,
+    Rsp,
+    Rbp,
+    Rdi,
+    Rsi,
+    Rdx,
+    Rcx,
+    Rbx,
+    Rax,
 }
 
 pub enum RegisterType {

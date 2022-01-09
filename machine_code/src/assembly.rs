@@ -5,8 +5,10 @@ pub mod asm {
         Mov(IOperatorSize),
         Push(IOperatorSize),
         Pop(IOperatorSize),
-        Ret,
         Call,
+        Ret,
+        Setnz,
+        Add(IOperatorSize),
     }
 
     impl fmt::Display for Op {
@@ -20,15 +22,20 @@ pub mod asm {
                     Pop(s) => format!("pop{}", s),
                     Call => "call".into(),
                     Ret => "ret".into(),
+                    Setnz => "setnz".into(),
+                    Add(s) => format!("add{}", s),
                 }
             )
         }
     }
 
     use intermediate_code::ioperator::IOperatorSize;
-    use syntax::{ConstantNodeValue, SymbolId};
+    use syntax::ConstantNodeValue;
 
-    use crate::register::Register;
+    use crate::{
+        reg_alloc::{StackOffset, StoredLocation},
+        register::Register,
+    };
 
     use self::Op::*;
 
@@ -37,8 +44,9 @@ pub mod asm {
         None,
         Immediate(ConstantNodeValue),
         Register(Register),
-        Global(SymbolId),
+        Global(String),
         Label(String),
+        Stack(StackOffset),
     }
 
     impl From<Register> for Src {
@@ -58,17 +66,29 @@ pub mod asm {
                     Self::Immediate(i) => format!("${}", i),
                     Self::Register(r) => r.to_string(),
                     Self::Label(l) => l.to_string(),
+                    Self::Stack(o) => format!("%rsp"),
                 }
             )
         }
     }
 
+    #[derive(Clone)]
     pub enum Dest {
         None,
         Register(Register),
-        MemAddress(String),
+        Stack(StackOffset),
         Global(String),
         Label(String),
+    }
+
+    impl From<&StoredLocation> for Dest {
+        fn from(loc: &StoredLocation) -> Self {
+            match loc {
+                StoredLocation::Global(g) => Dest::Global(g.to_string()),
+                StoredLocation::Reg(r) => Dest::Register(*r),
+                StoredLocation::Stack(s) => Dest::Stack(*s),
+            }
+        }
     }
 
     impl From<Register> for Dest {
@@ -86,7 +106,7 @@ pub mod asm {
                     Self::None => "".into(),
                     Self::Register(r) => r.to_string(),
                     Self::Global(s) => format!("v{}(%rip)", s),
-                    Self::MemAddress(m) => m.to_string(),
+                    Self::Stack(offset) => format!("{}(%rsp)", offset.0),
                     Self::Label(l) => l.to_string(),
                 }
             )
@@ -118,6 +138,7 @@ pub mod asm {
         }
     }
 
+    #[derive(Clone)]
     pub struct Label(pub String);
 
     impl Label {
