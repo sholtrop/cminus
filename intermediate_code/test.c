@@ -1,4 +1,5 @@
-int8_t main(void)
+int main(void)
 {
-    return 1;
+    int x = 1 == 1;
+    return x;
 }

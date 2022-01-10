@@ -1,4 +1,5 @@
-int8_t main(void)
+int main(void)
 {
-    return 1 + 1;
+    int8_t x = 3 - 2 - 1;
+    return x;
 }

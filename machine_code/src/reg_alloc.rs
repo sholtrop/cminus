@@ -46,12 +46,6 @@ pub struct RegAlloc<'a> {
     globals: HashMap<SymbolId, (String, IOperatorSize)>,
 }
 
-pub struct StoredLocations {
-    src1: Option<StoredLocation>,
-    src2: Option<StoredLocation>,
-    dest: StoredLocation,
-}
-
 #[derive(PartialEq)]
 pub enum RW {
     Read,

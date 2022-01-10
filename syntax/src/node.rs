@@ -139,20 +139,49 @@ impl std::ops::Add for ConstantNodeValue {
 
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (ConstantNodeValue::Int(x), ConstantNodeValue::Int(y)) => ConstantNodeValue::Int(x + y),
+            (ConstantNodeValue::Int(x), ConstantNodeValue::Int(y)) => {
+                ConstantNodeValue::Int(i32::wrapping_add(x, y))
+            }
             (ConstantNodeValue::Uint(x), ConstantNodeValue::Uint(y)) => {
-                ConstantNodeValue::Uint(x + y)
+                ConstantNodeValue::Uint(u32::wrapping_add(x, y))
             }
 
             (ConstantNodeValue::Int8(x), ConstantNodeValue::Int8(y)) => {
-                ConstantNodeValue::Int8(x + y)
+                ConstantNodeValue::Int8(i8::wrapping_add(x, y))
             }
 
             (ConstantNodeValue::Uint8(x), ConstantNodeValue::Uint8(y)) => {
-                ConstantNodeValue::Uint8(x + y)
+                ConstantNodeValue::Uint8(u8::wrapping_add(x, y))
             }
             _ => unreachable!(
                 "Cannot add two different ConstantNodeValue types: {:?} and {:?}",
+                self, rhs
+            ),
+        }
+    }
+}
+
+impl std::ops::Sub for ConstantNodeValue {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (ConstantNodeValue::Int(x), ConstantNodeValue::Int(y)) => {
+                ConstantNodeValue::Int(i32::wrapping_sub(x, y))
+            }
+            (ConstantNodeValue::Uint(x), ConstantNodeValue::Uint(y)) => {
+                ConstantNodeValue::Uint(u32::wrapping_sub(x, y))
+            }
+
+            (ConstantNodeValue::Int8(x), ConstantNodeValue::Int8(y)) => {
+                ConstantNodeValue::Int8(i8::wrapping_sub(x, y))
+            }
+
+            (ConstantNodeValue::Uint8(x), ConstantNodeValue::Uint8(y)) => {
+                ConstantNodeValue::Uint8(u8::wrapping_sub(x, y))
+            }
+            _ => unreachable!(
+                "Cannot subtract two different ConstantNodeValue types: {:?} and {:?}",
                 self, rhs
             ),
         }
@@ -388,6 +417,25 @@ impl SyntaxNode {
         } else {
             panic!("Node {} was not a number", self);
         }
+    }
+
+    pub fn is_binop(&self) -> bool {
+        matches!(
+            self.node_type(),
+            NodeType::Add
+                | NodeType::And
+                | NodeType::Or
+                | NodeType::Sub
+                | NodeType::Mul
+                | NodeType::Mod
+                | NodeType::Div
+                | NodeType::RelEqual
+                | NodeType::RelNotEqual
+                | NodeType::RelGT
+                | NodeType::RelGTE
+                | NodeType::RelLT
+                | NodeType::RelLTE
+        )
     }
 }
 

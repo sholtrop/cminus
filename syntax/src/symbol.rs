@@ -36,7 +36,6 @@ impl From<&ReturnType> for usize {
 
 impl PartialOrd for ReturnType {
     /// Defines a partial ordering for the purpose of type coercion as follows:
-    /// Coercions are allowed:
     /// ```
     /// From      To
     /// UINT      BOOL

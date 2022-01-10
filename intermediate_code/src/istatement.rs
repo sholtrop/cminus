@@ -126,6 +126,14 @@ impl IStatement {
     pub fn is_param(&self) -> bool {
         self.operator == IOperator::Param
     }
+
+    pub fn get_triple(&self) -> (&IOperand, &IOperand, &IOperand) {
+        (
+            self.operand1.as_ref().unwrap(),
+            self.operand2.as_ref().unwrap(),
+            self.ret_target.as_ref().unwrap(),
+        )
+    }
 }
 
 impl fmt::Display for IStatement {

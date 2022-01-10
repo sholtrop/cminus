@@ -53,10 +53,22 @@ impl<'a> CodeGenerator<'a> {
                     self.emitter.emit_return(stmt.operand1.as_ref());
                 }
                 Add => {
-                    let lhs = stmt.operand1.as_ref().unwrap();
-                    let rhs = stmt.operand2.as_ref().unwrap();
-                    let ret = stmt.ret_target.as_ref().unwrap().id();
-                    self.emitter.emit_add(lhs, rhs, &ret);
+                    let (lhs, rhs, ret) = stmt.get_triple();
+                    self.emitter.emit_add(lhs, rhs, &ret.id());
+                }
+                Sub => {
+                    let (lhs, rhs, ret) = stmt.get_triple();
+                    self.emitter.emit_sub(lhs, rhs, &ret.id());
+                }
+                Coerce => {
+                    let src = stmt.operand1.as_ref().unwrap();
+                    let dest = stmt.ret_target.as_ref().unwrap().id();
+                    self.emitter.emit_cast(src, &dest);
+                }
+                Assign => {
+                    let src = stmt.operand2.as_ref().unwrap();
+                    let dest = stmt.ret_target.as_ref().unwrap().id();
+                    self.emitter.emit_assign(src, &dest);
                 }
                 _ => todo!("{}", stmt),
             }

@@ -9,6 +9,13 @@ pub mod asm {
         Ret,
         Setnz,
         Add(IOperatorSize),
+        Comp(IOperatorSize),
+        Setne,
+        // Mov with sign-extension
+        Movs(IOperatorSize, IOperatorSize),
+        // Mov with zero-extension
+        Movz(IOperatorSize, IOperatorSize),
+        Sub(IOperatorSize),
     }
 
     impl fmt::Display for Op {
@@ -24,6 +31,11 @@ pub mod asm {
                     Ret => "ret".into(),
                     Setnz => "setnz".into(),
                     Add(s) => format!("add{}", s),
+                    Comp(s) => format!("cmp{}", s),
+                    Setne => "setne".into(),
+                    Movs(to, from) => format!("movz{}{}", to, from),
+                    Movz(to, from) => format!("movs{}{}", to, from),
+                    Sub(s) => format!("sub{}", s),
                 }
             )
         }
@@ -66,7 +78,7 @@ pub mod asm {
                     Self::Immediate(i) => format!("${}", i),
                     Self::Register(r) => r.to_string(),
                     Self::Label(l) => l.to_string(),
-                    Self::Stack(o) => format!("%rsp"),
+                    Self::Stack(o) => format!("{}%rbp", o.0),
                 }
             )
         }
@@ -79,6 +91,7 @@ pub mod asm {
         Stack(StackOffset),
         Global(String),
         Label(String),
+        Immediate(ConstantNodeValue),
     }
 
     impl From<&StoredLocation> for Dest {
@@ -108,6 +121,7 @@ pub mod asm {
                     Self::Global(s) => format!("v{}(%rip)", s),
                     Self::Stack(offset) => format!("{}(%rsp)", offset.0),
                     Self::Label(l) => l.to_string(),
+                    Self::Immediate(v) => v.to_string(),
                 }
             )
         }

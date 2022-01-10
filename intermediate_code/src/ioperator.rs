@@ -4,7 +4,7 @@ use syntax::ConstantNodeValue;
 use syntax::NodeType;
 use syntax::ReturnType;
 
-#[derive(PartialEq, Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Copy, Debug, Eq)]
 pub enum IOperatorSize {
     Void,
     Byte,
@@ -65,6 +65,22 @@ impl From<IOperatorSize> for usize {
             IOperatorSize::Quad => 8,
             IOperatorSize::Void => 0,
         }
+    }
+}
+
+impl PartialOrd for IOperatorSize {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let x: usize = (*self).into();
+        let y: usize = (*other).into();
+        x.partial_cmp(&y)
+    }
+}
+
+impl Ord for IOperatorSize {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let x: usize = (*self).into();
+        let y: usize = (*other).into();
+        x.cmp(&y)
     }
 }
 

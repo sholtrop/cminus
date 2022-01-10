@@ -440,28 +440,29 @@ impl TreeWalker {
                     })
                     .collect::<VecDeque<SyntaxNode>>();
                 while list.len() != 1 {
-                    let mut highest_prec;
-                    let highest_idx = list
-                        .iter()
+                    let mut highest_prec = 0;
+                    let mut highest_prec_idx = 0;
+                    list.iter()
+                        .filter(|s| s.is_binop())
+                        .map(|s| s.precedence().unwrap())
                         .enumerate()
-                        .filter(|(idx, _)| idx % 2 == 1)
-                        .position_max_by(|(_, a), (_, b)| {
-                            a.precedence().unwrap().cmp(&b.precedence().unwrap())
-                        })
-                        .unwrap()
-                        * 2
-                        + 1;
+                        .for_each(|(i, s)| {
+                            if s > highest_prec {
+                                highest_prec = s;
+                                highest_prec_idx = i * 2 + 1;
+                            }
+                        });
 
-                    highest_prec = list.remove(highest_idx).unwrap();
+                    let mut highest_prec_node = list.remove(highest_prec_idx).unwrap();
                     log::trace!(
                         "Highest idx {} | Highest prec {}",
-                        highest_idx,
-                        highest_prec
+                        highest_prec_idx,
+                        highest_prec_node
                     );
-                    let new_left = list.remove(highest_idx - 1).unwrap();
-                    let new_right = list.remove(highest_idx - 1).unwrap();
-                    visitor.visit_binary(new_left, &mut highest_prec, new_right);
-                    list.insert(highest_idx - 1, highest_prec);
+                    let new_left = list.remove(highest_prec_idx - 1).unwrap();
+                    let new_right = list.remove(highest_prec_idx - 1).unwrap();
+                    visitor.visit_binary(new_left, &mut highest_prec_node, new_right);
+                    list.insert(highest_prec_idx - 1, highest_prec_node);
                 }
                 let expr_node = list.pop_front().unwrap();
                 ParserValue::Node(expr_node)
