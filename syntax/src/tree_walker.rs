@@ -8,7 +8,6 @@ use crate::{
     symbol::{ReturnType, Symbol, SymbolType},
     visitor::Visitor,
 };
-use itertools::Itertools;
 use lexical::{ParseNode, ParseTree, Rule};
 
 #[derive(Debug)]

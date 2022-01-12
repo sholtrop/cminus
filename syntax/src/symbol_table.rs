@@ -168,13 +168,13 @@ impl SymbolTable {
         Some(&self.functions.get(func_id)?.parameters)
     }
 
-    pub fn get_func_param_symbols(&self, func_id: &SymbolId) -> Option<Vec<(&SymbolId, Symbol)>> {
+    pub fn get_func_param_symbols(&self, func_id: &SymbolId) -> Vec<(&SymbolId, Symbol)> {
         let mut symbols = vec![];
-        for id in self.get_func_param_ids(func_id)? {
-            let sym = self.symbols.get(id)?.symbol.clone();
+        for id in self.get_func_param_ids(func_id).unwrap() {
+            let sym = self.symbols.get(id).unwrap().symbol.clone();
             symbols.push((id, sym));
         }
-        Some(symbols)
+        symbols
     }
 
     pub fn get_func_var_ids(&self, func_id: SymbolId) -> Option<&Vec<SymbolId>> {

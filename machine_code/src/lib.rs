@@ -22,7 +22,7 @@ pub fn compile_file(input_path: &str, output_path: Option<&str>) -> Result<(), S
         warnings,
         tree,
         mut symbol_table,
-    } = syntax::generate(&file).unwrap();
+    } = syntax::generate(&file).unwrap_or_else(|e| panic!("Error parsing file:\n{}", e));
     let has_errors = !errors.is_empty();
     if has_errors {
         syntax::display_errors(&errors);

@@ -1,5 +1,9 @@
+int func3(int a, int b, int c, int d)
+{
+    return a + b + c + d;
+}
+
 int main(void)
 {
-    int x = 1 == 1;
-    return x;
+    return func3(9, 10, 11, 12);
 }

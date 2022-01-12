@@ -106,9 +106,6 @@ impl SyntaxBuilder {
         let syms = self
             .table
             .get_func_param_symbols(id)
-            .ok_or_else(|| {
-                SyntaxBuilderError(format!("Symbol with id {} not found in function table", id))
-            })?
             .into_iter()
             .map(|(_, sym)| sym)
             .collect();

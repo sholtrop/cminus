@@ -8,16 +8,9 @@ use syntax::{ConstantNodeValue, ReturnType, SymbolId, SymbolTable, SymbolType};
 use crate::{
     assembly::asm::*,
     output::{self, OutStream},
-    reg_alloc::{RegAlloc, RW},
+    reg_alloc::{RegAlloc, StoredLocation, RW},
     register::{reg, RegisterName::*},
 };
-
-pub struct CodeEmitter<'a> {
-    out: OutStream,
-    reg_alloc: RegAlloc<'a>,
-    table: &'a SymbolTable,
-    line: ICLineNumber,
-}
 
 pub enum SignChange {
     SignedToUnsigned,
@@ -30,6 +23,12 @@ pub enum CastType {
     Upcast(SignChange),
     Reinterpret,
     Downcast,
+}
+pub struct CodeEmitter<'a> {
+    out: OutStream,
+    reg_alloc: RegAlloc<'a>,
+    table: &'a SymbolTable,
+    line: ICLineNumber,
 }
 
 impl<'a> CodeEmitter<'a> {
@@ -80,11 +79,13 @@ impl<'a> CodeEmitter<'a> {
         self.write(&label);
     }
 
-    pub fn emit_func(&self, id: &SymbolId) {
+    pub fn emit_func(&mut self, id: &SymbolId) {
         let name = self.table.get_symbol(id).unwrap().name.clone().0;
         self.write(&Directive::Global(name.clone()));
         self.write(&format!("{}:\n", name));
         self.emit_prologue();
+        let params = self.table.get_func_param_ids(id).unwrap();
+        self.reg_alloc.alloc_func_params(params);
     }
 
     /// Emits a function prologue
@@ -121,11 +122,34 @@ impl<'a> CodeEmitter<'a> {
         self.emit_epilogue();
     }
 
-    pub fn emit_call(&self, id: &SymbolId, ret: &Option<IOperand>) {
-        // TODO: save parameters, then pop them in reverse order for the called function
-        let func_name = self.table.get_symbol(id).unwrap().name.clone().0;
+    pub fn emit_param(&mut self, value: &IOperand) {
+        let size = value.ret_type().into();
+        let dest: Dest = (&self.reg_alloc.alloc_call_param(size)).into();
+        let src = match value {
+            IOperand::Immediate { value, .. } => Src::Immediate(*value),
+            IOperand::Symbol { id, .. } => {
+                let loc = self.reg_alloc.alloc_var(id, RW::Read);
+                loc.into()
+            }
+            _ => panic!("Unknown operand value {}", value),
+        };
+        let instr = instr(Op::Mov(size), src, dest);
+        self.write(&instr);
+    }
+
+    pub fn emit_call(&mut self, id: &SymbolId, ret: &Option<SymbolId>) {
+        let func_sym = self.table.get_symbol(id).unwrap();
+        let func_name = func_sym.name.clone().0;
+        let func_ret_size = func_sym.return_type.into();
         self.write(&instr(Op::Call, Src::Label(func_name), Dest::None));
-        // TODO: return value is in %rax and may need to be moved somewhere else
+        if let Some(ret) = ret {
+            let size = self.table.get_symbol(ret).unwrap().return_type.into();
+            let dest = self.reg_alloc.alloc_var(ret, RW::Write);
+            let rax = reg(Rax, func_ret_size);
+            let instr = instr(Op::Mov(size), rax, &dest);
+            self.write(&instr);
+        }
+        self.reg_alloc.free_param_regs();
     }
 
     /// Emits one of the following casts:
@@ -143,7 +167,7 @@ impl<'a> CodeEmitter<'a> {
         let dest_type = self.table.get_symbol(dest).unwrap().return_type;
         let src_size = src_type.into();
         let dest_size: IOperatorSize = dest_type.into();
-        let dest = self.reg_alloc.alloc_single(dest, RW::Write);
+        let dest = self.reg_alloc.alloc_var(dest, RW::Write);
 
         if is_immediate {
             let instr = instr(Op::Mov(dest_size), src, &dest);
@@ -167,7 +191,6 @@ impl<'a> CodeEmitter<'a> {
             }
             CastType::Reinterpret => {
                 log::trace!("Reinterpret cast");
-                // todo!("Issue mov instr if src is an immediate. Otherwise, shouldn't need to do anything");
                 if let Src::Immediate(_) = src {
                     let instr = instr(Op::Mov(src_size), src, &dest);
                     self.write(&instr);
@@ -192,11 +215,11 @@ impl<'a> CodeEmitter<'a> {
         let (lhs, ret_type) = self.get_source(lhs);
         let size = ret_type.into();
         let (rhs, _) = self.get_source(rhs);
-        let ret = self.reg_alloc.alloc_single(ret, RW::Write);
+        let ret = self.reg_alloc.alloc_var(ret, RW::Write);
 
         if let Src::Immediate(x) = lhs {
             if let Src::Immediate(y) = rhs {
-                // Two immediates do not need a temp
+                // Constant-fold two immediates
                 let instr = instr(Op::Mov(size), Src::Immediate(x + y), &ret);
                 self.write(&instr);
             }
@@ -210,7 +233,8 @@ impl<'a> CodeEmitter<'a> {
 
     pub fn emit_assign(&mut self, src: &IOperand, dest: &SymbolId) {
         let (src, src_ret) = self.get_source(src);
-        let dest = self.reg_alloc.alloc_single(dest, RW::Write);
+        log::trace!("{} {}", src, src_ret);
+        let dest = self.reg_alloc.alloc_var(dest, RW::Write);
         let instr = instr(Op::Mov(src_ret.into()), src, &dest);
         self.write(&instr);
     }
@@ -219,11 +243,11 @@ impl<'a> CodeEmitter<'a> {
         let (lhs, ret_type) = self.get_source(lhs);
         let size = ret_type.into();
         let (rhs, _) = self.get_source(rhs);
-        let ret = self.reg_alloc.alloc_single(ret, RW::Write);
+        let ret = self.reg_alloc.alloc_var(ret, RW::Write);
 
         if let Src::Immediate(x) = lhs {
             if let Src::Immediate(y) = rhs {
-                // Two immediates do not need a temp
+                // Constant-fold two immediates
                 let instr = instr(Op::Mov(size), Src::Immediate(x - y), &ret);
                 self.write(&instr);
             }
@@ -239,7 +263,7 @@ impl<'a> CodeEmitter<'a> {
         match *src {
             IOperand::Immediate { value, ret_type } => (Src::Immediate(value), ret_type),
             IOperand::Symbol { id, ret_type } => {
-                let r = self.reg_alloc.alloc_single(&id, RW::Read);
+                let r = self.reg_alloc.alloc_var(&id, RW::Read);
                 (r.into(), ret_type)
             }
             IOperand::Unknown => unreachable!(),

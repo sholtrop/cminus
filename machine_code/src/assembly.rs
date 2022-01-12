@@ -41,7 +41,7 @@ pub mod asm {
         }
     }
 
-    use intermediate_code::ioperator::IOperatorSize;
+    use intermediate_code::{ioperand::IOperand, ioperator::IOperatorSize};
     use syntax::ConstantNodeValue;
 
     use crate::{

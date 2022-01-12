@@ -52,13 +52,16 @@ pub enum RW {
     Write,
 }
 
+const N_PARAM_REGS: usize = 6;
+const PARAM_REGS: [RegisterName; N_PARAM_REGS] = [R9, R8, Rcx, Rdx, Rsi, Rdi];
+
 impl<'a> RegAlloc<'a> {
     pub fn new(out: OutStream, table: &'a SymbolTable, graph: &'a FlowGraph) -> Self {
         Self {
             out,
             reg_locals: HashMap::new(),
             stack_locals: HashMap::new(),
-            param_regs: BinaryHeap::from_iter([R9, R8, Rcx, Rdx, Rsi, Rdi]),
+            param_regs: BinaryHeap::from_iter(PARAM_REGS),
             gpurpose_regs: BinaryHeap::from_iter([R15, R14, R13, R12, R11, R10]),
             table,
             graph,
@@ -91,21 +94,10 @@ impl<'a> RegAlloc<'a> {
         self.current_line = line;
     }
 
-    pub fn alloc_single(&mut self, id: &SymbolId, read_or_write: RW) -> StoredLocation {
+    pub fn alloc_var(&mut self, id: &SymbolId, read_or_write: RW) -> StoredLocation {
         let sym = self.table.get_symbol(id).unwrap();
         let size = IOperatorSize::from(sym.return_type);
-        let is_global = self.globals.contains_key(id);
-
-        let ret = if sym.is_param() {
-            // Params only go into the specified param registers
-            match self.param_regs.pop() {
-                Some(reg) => StoredLocation::Reg(Register::new(reg, size)),
-                None => {
-                    todo!("Stack offset for params")
-                    // StoredLocation::Stack(StackOffset(0))
-                }
-            }
-        } else if is_global {
+        let ret = if self.globals.contains_key(id) {
             if read_or_write == RW::Read {
                 // Global is already loaded into a register. Read from that register instead of .data section.
                 if let Some((_, alias)) = self.reg_locals.iter().find(|(k, _)| *k == id) {
@@ -135,6 +127,31 @@ impl<'a> RegAlloc<'a> {
         );
 
         ret
+    }
+
+    pub fn alloc_func_params(&mut self, params: &[SymbolId]) {
+        if params.len() > N_PARAM_REGS {
+            todo!("Allocate stack space for param passing");
+        }
+        for (idx, param) in params.iter().enumerate() {
+            let reg = PARAM_REGS[N_PARAM_REGS - idx - 1];
+            self.reg_locals.insert(*param, reg);
+            log::trace!("Alloc {} to {:#?}", param, reg);
+        }
+    }
+
+    pub fn alloc_call_param(&mut self, size: IOperatorSize) -> StoredLocation {
+        // Params only go into the specified param registers
+        match self.param_regs.pop() {
+            Some(reg) => StoredLocation::Reg(Register::new(reg, size)),
+            None => {
+                todo!("Stack offset for params");
+            }
+        }
+    }
+
+    pub fn free_param_regs(&mut self) {
+        self.param_regs = BinaryHeap::from_iter(PARAM_REGS);
     }
 
     /// Assigns a register to a single [SymbolId] `sym` based on the following rules:

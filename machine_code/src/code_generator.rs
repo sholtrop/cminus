@@ -48,7 +48,9 @@ impl<'a> CodeGenerator<'a> {
             self.emitter.set_line(line);
             match stmt.operator {
                 Func => self.emitter.emit_func(&stmt.label_id()),
-                FuncCall => self.emitter.emit_call(&stmt.label_id(), &stmt.ret_target),
+                FuncCall => self
+                    .emitter
+                    .emit_call(&stmt.label_id(), &stmt.ret_target.as_ref().map(|s| s.id())),
                 Return => {
                     self.emitter.emit_return(stmt.operand1.as_ref());
                 }
@@ -70,6 +72,10 @@ impl<'a> CodeGenerator<'a> {
                     let dest = stmt.ret_target.as_ref().unwrap().id();
                     self.emitter.emit_assign(src, &dest);
                 }
+                Param => self.emitter.emit_param(stmt.operand1.as_ref().unwrap()),
+                Je | Jne | Jz | Jnz | Ja | Jae | Jb | Jbe | Jg | Jge | Jl | Jle => {}
+                Goto => {}
+
                 _ => todo!("{}", stmt),
             }
         }

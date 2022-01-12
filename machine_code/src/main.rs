@@ -22,5 +22,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let input = matches.value_of("INPUT").unwrap();
     let output = matches.value_of("OUTPUT");
     compile_file(input, output)?;
+    log::info!("Compilation successful");
     Ok(())
 }

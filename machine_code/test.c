@@ -1,5 +1,9 @@
+int func(int a, int b, int c, int d)
+{
+    return a + b + c + d;
+}
+
 int main(void)
 {
-    int8_t x = 3 - 2 - 1;
-    return x;
+    return func(1, 2, 3, 4);
 }

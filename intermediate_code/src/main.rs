@@ -77,12 +77,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("\n{}", tree);
     match ic {
         Ok(Intermediate { ref graph, icode }) => {
-            log::info!("\n{}", icode);
             if annotate {
                 log::info!(
                     "\nAnnotated:\n{}",
                     symbol_table.annotate_icode(icode.to_string())
                 );
+            } else {
+                log::info!("\n{}", icode);
             }
             if let Some(filename) = graph_filename {
                 save_cfg(filename, graph);
