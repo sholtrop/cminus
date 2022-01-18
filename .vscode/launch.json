@@ -5,6 +5,13 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "type": "gdb",
+      "request": "launch",
+      "name": "GDB",
+      "program": "${workspaceFolder}/${command:AskForProgramName}",
+      "stopOnEntry": true
+    },
+    {
       "type": "lldb",
       "request": "launch",
       "name": "Debug unit tests in library 'lexical'",

@@ -1,6 +1,5 @@
 use crate::{
-    error::ICodeError, flow_graph::FlowGraph, ic_info::ICLineNumber, icode::IntermediateCode,
-    ivisitor::IVisitor,
+    error::ICodeError, flow_graph::FlowGraph, icode::IntermediateCode, ivisitor::IVisitor,
 };
 use std::fmt;
 use syntax::{SymbolTable, SyntaxTree};

@@ -89,26 +89,22 @@ impl<'a> IVisitor<'a> {
             Add | Sub | Mul | Div | Mod | And | Or | RelEqual | RelNotEqual | RelGT | RelGTE
             | RelLT | RelLTE => {
                 let (l, r) = exp.get_both_binary_children();
-                let common_ret = l.return_type();
-                let operator = if common_ret.is_unsigned() {
+                let ret_type = match ntype {
+                    RelEqual | RelNotEqual | RelGT | RelGTE | RelLT | RelLTE => ReturnType::Bool,
+                    _ => l.return_type(),
+                };
+                let operator = if ret_type.is_unsigned() {
                     IOperator::from(ntype).to_unsigned()
                 } else {
                     IOperator::from(ntype)
                 };
-                assert!(
-                    common_ret == r.return_type(),
-                    "Return types were not the same - coercion violation"
-                );
                 let l_expr = self.accept_expression(l);
                 let r_expr = self.accept_expression(r);
 
-                let ret = self.make_temp(common_ret);
-                let ret_target = IOperand::Symbol {
-                    id: ret,
-                    ret_type: common_ret,
-                };
+                let ret = self.make_temp(ret_type);
+                let ret_target = IOperand::Symbol { id: ret, ret_type };
                 self.icode.append_statement(IStatement {
-                    op_type: common_ret.into(),
+                    op_type: ret_type.into(),
                     operator,
                     operand1: Some(l_expr),
                     operand2: Some(r_expr),
@@ -274,7 +270,7 @@ impl<'a> IVisitor<'a> {
         // Check condition, jump to else-label if condition was false
         self.icode.append_statement(IStatement {
             op_type: IOperatorSize::Void,
-            operator: IOperator::Jz,
+            operator: IOperator::Jne,
             operand1: Some(cond_expr),
             operand2: None,
             ret_target: Some(IOperand::Symbol {
@@ -307,32 +303,26 @@ impl<'a> IVisitor<'a> {
     }
 
     fn visit_while(&mut self, cond: &SyntaxNode, body: &SyntaxNode) {
-        let start_loop = self.make_label();
-        let end_loop = self.make_label();
-        // start label
+        let loop_cond = self.make_label();
+        let loop_body = self.make_label();
         self.icode
-            .append_statement(IStatement::make_label(start_loop));
-        // eval expression
+            .append_statement(IStatement::make_goto(loop_cond));
+        self.icode
+            .append_statement(IStatement::make_label(loop_body));
+        self.accept(body);
+        self.icode
+            .append_statement(IStatement::make_label(loop_cond));
         let cond_expr = self.accept_expression(cond);
-        // jump over while body if expression is false
         self.icode.append_statement(IStatement {
             op_type: IOperatorSize::Void,
-            operator: IOperator::Jz,
+            operator: IOperator::Jne,
             operand1: Some(cond_expr),
             operand2: None,
             ret_target: Some(IOperand::Symbol {
-                id: end_loop,
+                id: loop_body,
                 ret_type: ReturnType::Void,
             }),
         });
-        // while-body
-        self.accept(body);
-        // jump to beginning of loop
-        self.icode
-            .append_statement(IStatement::make_goto(start_loop));
-        // end label
-        self.icode
-            .append_statement(IStatement::make_label(end_loop));
     }
 
     fn visit_func_call(&mut self, func: &SyntaxNode, args: Option<&SyntaxNode>) -> IOperand {
@@ -425,7 +415,7 @@ impl<'a> IVisitor<'a> {
     }
 
     fn make_label(&mut self) -> SymbolId {
-        let name = "@".to_string() + &self.label_counter.to_string();
+        let name = ".L".to_string() + &self.label_counter.to_string();
         self.label_counter += 1;
         self.table.add_label(name, self.current_func())
     }
