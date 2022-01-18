@@ -1,14 +1,17 @@
 use intermediate_code::{
     ic_info::ICLineNumber,
     ioperand::IOperand,
-    ioperator::IOperatorSize::{self, *},
+    ioperator::{
+        IOperator,
+        IOperatorSize::{self, *},
+    },
 };
-use syntax::{ConstantNodeValue, ReturnType, SymbolId, SymbolTable, SymbolType};
+use syntax::{ConstantNodeValue, ReturnType, SymbolId, SymbolName, SymbolTable, SymbolType};
 
 use crate::{
     assembly::asm::*,
     output::{self, OutStream},
-    reg_alloc::{RegAlloc, StoredLocation, RW},
+    reg_alloc::{RegAlloc, RW},
     register::{reg, RegisterName::*},
 };
 
@@ -50,23 +53,42 @@ impl<'a> CodeEmitter<'a> {
         self.reg_alloc.generate_data_segment();
     }
 
-    // pub fn emit_store(&self, dst: &SymbolId, src: &IOperand) {
-    //     todo!("Register allocation");
-    //     let size = src.ret_type().into();
-    //     let op = Op::Mov(size);
-    //     let src = match *src {
-    //         IOperand::Immediate { value, .. } => Src::Immediate(value),
-    //         IOperand::Symbol { id, .. } => {
-    //             let sym = self.table.get_symbol(&id).unwrap();
-    //             Src::Register(reg(Rax, size))
-    //         }
-    //         _ => unreachable!(),
-    //     };
-    //     let dst = Dest::Register(reg(Rbx, size));
-    //     self.write(&instr(op, src, dst));
-    // }
+    pub fn emit_goto(&mut self, label: &SymbolId) {
+        let label_name = self.get_label_name(label);
+        let jump_instr = instr(Op::Jmp, Src::Label(label_name.to_string()), Dest::None);
+        self.write(&jump_instr);
+    }
 
-    // pub fn emit_load(&mut self, dst: &SymbolId, src: &IOperand) {}
+    pub fn emit_conditional_jump(
+        &mut self,
+        jump_type: &IOperator,
+        label: &SymbolId,
+        expr: &IOperand,
+    ) {
+        let op = match *jump_type {
+            IOperator::Je | IOperator::Jz => Op::Je,
+            IOperator::Jne | IOperator::Jnz => Op::Jne,
+            IOperator::Ja => Op::Ja,
+            IOperator::Jae => Op::Jae,
+            IOperator::Jb => Op::Jb,
+            IOperator::Jbe => Op::Jbe,
+            IOperator::Jg => Op::Jg,
+            IOperator::Jge => Op::Jge,
+            IOperator::Jl => Op::Jl,
+            IOperator::Jle => Op::Jle,
+            _ => unreachable!(),
+        };
+        let (l, ret) = self.get_source(expr);
+        let comp_instr = instr2(
+            Op::Comp(ret.into()),
+            Src::Immediate(ConstantNodeValue::Uint8(1)),
+            l,
+        );
+        self.write(&comp_instr);
+        let label_name = self.get_label_name(label);
+        let jump_instr = instr(op, Src::Label(label_name.to_string()), Dest::None);
+        self.write(&jump_instr);
+    }
 
     pub fn emit_label(&self, id: &SymbolId) {
         let label = match self.table.get_symbol(id) {
@@ -185,7 +207,8 @@ impl<'a> CodeEmitter<'a> {
                     _ => unreachable!(),
                 };
                 let instr_cmp = instr(Op::Comp(src_size), src, Dest::Immediate(zero));
-                let instr_setne = instr(Op::Setne, Src::None, &dest);
+                let setne_src: Src = dest.into();
+                let instr_setne = instr(Op::Setne, setne_src, Dest::None);
                 self.write(&instr_cmp);
                 self.write(&instr_setne);
             }
@@ -259,6 +282,37 @@ impl<'a> CodeEmitter<'a> {
         };
     }
 
+    pub fn emit_set(
+        &mut self,
+        set_type: &IOperator,
+        lhs: &IOperand,
+        rhs: &IOperand,
+        dest: &SymbolId,
+    ) {
+        let (l, ret) = self.get_source(lhs);
+        let (r, _) = self.get_source(rhs);
+        let size = ret.into();
+        let dest = self.reg_alloc.alloc_var(dest, RW::Write);
+        let op = match *set_type {
+            IOperator::SetE => Op::SetE,
+            IOperator::SetNE => Op::SetNE,
+            IOperator::SetA => Op::SetA,
+            IOperator::SetAE => Op::SetAE,
+            IOperator::SetB => Op::SetB,
+            IOperator::SetBE => Op::SetBE,
+            IOperator::SetG => Op::SetG,
+            IOperator::SetGE => Op::SetGE,
+            IOperator::SetL => Op::SetL,
+            IOperator::SetLE => Op::SetLE,
+            _ => unreachable!(),
+        };
+        log::trace!("COMP; {} {}", l, r);
+        let cmp_instr = instr2(Op::Comp(size), l, r);
+        self.write(&cmp_instr);
+        let set_instr = instr(op, &dest, Dest::None);
+        self.write(&set_instr);
+    }
+
     fn get_source(&mut self, src: &IOperand) -> (Src, ReturnType) {
         match *src {
             IOperand::Immediate { value, ret_type } => (Src::Immediate(value), ret_type),
@@ -286,6 +340,16 @@ impl<'a> CodeEmitter<'a> {
                 CastType::Upcast(sign_change)
             }
             std::cmp::Ordering::Greater => CastType::Downcast,
+        }
+    }
+
+    fn get_label_name(&self, label: &SymbolId) -> &SymbolName {
+        match self.table.get_symbol(label) {
+            Some(sym) => match sym.symbol_type {
+                SymbolType::Label => &sym.name,
+                _ => unreachable!("Not a label symbol"),
+            },
+            _ => unreachable!("Label not found in symbol table"),
         }
     }
 

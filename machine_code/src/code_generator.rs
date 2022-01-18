@@ -1,8 +1,6 @@
-use intermediate_code::ioperand::IOperand;
 use intermediate_code::{flow_graph::FlowGraph, icode::IntermediateCode};
 use syntax::SymbolTable;
 
-use crate::assembly::asm::Src;
 use crate::emitter::CodeEmitter;
 use crate::output::{self, OutStream};
 use crate::reg_alloc::RegAlloc;
@@ -11,9 +9,9 @@ use intermediate_code::ioperator::IOperator::*;
 pub struct CodeGenerator<'a> {
     out: OutStream,
     emitter: CodeEmitter<'a>,
-    table: &'a SymbolTable,
+    // table: &'a SymbolTable,
     icode: &'a IntermediateCode,
-    graph: &'a FlowGraph,
+    // graph: &'a FlowGraph,
 }
 
 impl<'a> CodeGenerator<'a> {
@@ -27,9 +25,9 @@ impl<'a> CodeGenerator<'a> {
         let emitter = CodeEmitter::new(out.clone(), reg_alloc, table);
         Self {
             out,
-            table,
+            // table,
             icode,
-            graph,
+            // graph,
             emitter,
         }
     }
@@ -73,8 +71,24 @@ impl<'a> CodeGenerator<'a> {
                     self.emitter.emit_assign(src, &dest);
                 }
                 Param => self.emitter.emit_param(stmt.operand1.as_ref().unwrap()),
-                Je | Jne | Jz | Jnz | Ja | Jae | Jb | Jbe | Jg | Jge | Jl | Jle => {}
-                Goto => {}
+                Je | Jne | Jz | Jnz | Ja | Jae | Jb | Jbe | Jg | Jge | Jl | Jle => {
+                    let expr = stmt.operand1.as_ref().unwrap();
+                    self.emitter.emit_conditional_jump(
+                        &stmt.operator,
+                        &stmt.ret_target.as_ref().unwrap().id(),
+                        expr,
+                    );
+                }
+                Goto => {
+                    let ret = stmt.operand1.as_ref().unwrap();
+                    self.emitter.emit_goto(&ret.id());
+                }
+                SetE | SetNE | SetA | SetAE | SetB | SetBE | SetG | SetGE | SetL | SetLE => {
+                    let (l, r, ret) = stmt.get_triple();
+                    let ret_id = ret.id();
+                    self.emitter.emit_set(&stmt.operator, l, r, &ret_id);
+                }
+                Label => self.emitter.emit_label(&stmt.label_id()),
 
                 _ => todo!("{}", stmt),
             }

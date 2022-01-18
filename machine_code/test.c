@@ -1,9 +1,13 @@
-int func(int a, int b, int c, int d)
-{
-    return a + b + c + d;
-}
 
 int main(void)
 {
-    return func(1, 2, 3, 4);
+    int x = 0;
+
+    // 10 < x
+    // 10 < 11
+    while (x < 10)
+    {
+        x = x + 1;
+    }
+    return x;
 }

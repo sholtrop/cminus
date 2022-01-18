@@ -15,7 +15,11 @@ pub mod output;
 pub mod reg_alloc;
 pub mod register;
 
-pub fn compile_file(input_path: &str, output_path: Option<&str>) -> Result<(), String> {
+pub fn compile_file(
+    input_path: &str,
+    output_path: Option<&str>,
+    opt: OptLevel,
+) -> Result<(), String> {
     let file = std::fs::read_to_string(input_path).unwrap();
     let SyntaxAnalysisResult {
         errors,
@@ -29,8 +33,7 @@ pub fn compile_file(input_path: &str, output_path: Option<&str>) -> Result<(), S
         return Err("Syntax errors encountered".into());
     }
     syntax::display_warnings(&warnings);
-    let intermediate =
-        intermediate_code::generate(&tree, &mut symbol_table, OptLevel::None).unwrap();
+    let intermediate = intermediate_code::generate(&tree, &mut symbol_table, opt).unwrap();
     let out = if let Some(path) = output_path {
         std::fs::File::create(path).unwrap()
     } else {
