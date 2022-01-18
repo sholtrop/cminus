@@ -227,7 +227,9 @@ impl SymbolTable {
     pub fn get_globals(&self) -> HashMap<SymbolId, Symbol> {
         let mut hm = HashMap::new();
         for (id, info) in &self.symbols {
-            if info.symbol_scope == SymbolScope::Global {
+            if info.symbol_scope == SymbolScope::Global
+                && info.symbol.symbol_type != SymbolType::Function
+            {
                 hm.insert(*id, info.symbol.clone());
             }
         }

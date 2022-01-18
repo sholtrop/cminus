@@ -6,7 +6,7 @@ use syntax::{
     NodeType::{self, *},
     ReturnType,
 };
-use syntax::{SymbolId, SyntaxNode};
+use syntax::{SymbolId, SyntaxCell, SyntaxNode, SyntaxNodeBox};
 
 pub struct IVisitor<'a> {
     table: &'a mut syntax::SymbolTable,
@@ -30,9 +30,9 @@ impl<'a> IVisitor<'a> {
         self.icode
     }
 
-    fn accept(&mut self, node: &SyntaxNode) {
-        log::trace!("{}", node);
-        let ntype = node.node_type();
+    fn accept(&mut self, node: SyntaxNodeBox) {
+        log::trace!("{}", *node.borrow());
+        let ntype = (*node.borrow()).node_type();
         if ntype.is_expression() {
             self.accept_expression(node);
             return;
@@ -40,36 +40,36 @@ impl<'a> IVisitor<'a> {
         match ntype {
             Empty => {}
             StatementList => {
-                let (l, r) = node.get_binary_children();
+                let (l, r) = (*node.borrow()).get_binary_children();
                 self.accept(l.expect("Left of StatementList was None"));
                 if let Some(r) = r {
                     self.accept(r);
                 }
             }
             If => {
-                let (cond, targets) = node.get_both_binary_children();
-
+                let (cond, targets) = (*node.borrow()).get_both_binary_children();
+                // let t = (*targets.borrow());
                 // if without else
-                let (if_body, else_body) = if targets.node_type() != IfTargets {
+                let (if_body, else_body) = if (*targets.borrow()).node_type() != IfTargets {
                     (targets, None)
                 }
                 // if with else
                 else {
-                    let (if_body, else_body) = targets.get_both_binary_children();
+                    let (if_body, else_body) = (*targets.borrow()).get_both_binary_children();
                     (if_body, Some(else_body))
                 };
                 self.visit_if_else(cond, if_body, else_body);
             }
             While => {
-                let (cond, body) = node.get_both_binary_children();
+                let (cond, body) = (*node.borrow()).get_both_binary_children();
                 self.visit_while(cond, body);
             }
             Return => {
-                let ret_child = node.get_unary_child();
+                let ret_child = (*node.borrow()).get_unary_child();
                 self.visit_return(ret_child);
             }
             _ => {
-                unimplemented!("{:?}", node.node_type());
+                unimplemented!("{:?}", (*node.borrow()).node_type());
             }
         }
     }
@@ -78,20 +78,21 @@ impl<'a> IVisitor<'a> {
     // implement short-circuiting, i.e.
     // int x = 0 && func();
     // should never call `func`
-    fn accept_expression(&mut self, exp: &SyntaxNode) -> IOperand {
-        let ntype = exp.node_type();
+    fn accept_expression(&mut self, exp: SyntaxNodeBox) -> IOperand {
+        // let (*exp.borrow()) = (*exp.borrow());
+        let ntype = (*exp.borrow()).node_type();
         log::trace!("Expression: {}", ntype);
         match ntype {
             Assignment => {
-                let (l, r) = exp.get_both_binary_children();
+                let (l, r) = (*exp.borrow()).get_both_binary_children();
                 self.visit_assignment(l, r)
             }
             Add | Sub | Mul | Div | Mod | And | Or | RelEqual | RelNotEqual | RelGT | RelGTE
             | RelLT | RelLTE => {
-                let (l, r) = exp.get_both_binary_children();
+                let (l, r) = (*exp.borrow()).get_both_binary_children();
                 let ret_type = match ntype {
                     RelEqual | RelNotEqual | RelGT | RelGTE | RelLT | RelLTE => ReturnType::Bool,
-                    _ => l.return_type(),
+                    _ => (*l.borrow()).return_type(),
                 };
                 let operator = if ret_type.is_unsigned() {
                     IOperator::from(ntype).to_unsigned()
@@ -113,8 +114,8 @@ impl<'a> IVisitor<'a> {
                 ret_target
             }
             Coercion => {
-                let child = exp.get_unary_child().unwrap();
-                let ret_type = exp.return_type();
+                let child = (*exp.borrow()).get_unary_child().unwrap();
+                let ret_type = (*exp.borrow()).return_type();
                 let temp = self.make_temp(ret_type);
                 let precoercion = self.accept_expression(child);
                 let postcoercion = IOperand::Symbol { id: temp, ret_type };
@@ -128,16 +129,16 @@ impl<'a> IVisitor<'a> {
                 postcoercion
             }
             FunctionCall => {
-                let (func, args) = exp.get_binary_children();
+                let (func, args) = (*exp.borrow()).get_binary_children();
                 let func = func.unwrap();
                 self.visit_func_call(func, args)
             }
             ArrayAccess => self.visit_array_access(exp),
             Num => {
-                let num = exp.get_number();
+                let num = (*exp.borrow()).get_number();
                 IOperand::Immediate {
                     value: num,
-                    ret_type: exp.return_type(),
+                    ret_type: (*exp.borrow()).return_type(),
                 }
             }
             Id => {
@@ -145,18 +146,18 @@ impl<'a> IVisitor<'a> {
                     symbol_id,
                     return_type,
                     ..
-                } = exp
+                } = (*exp.borrow())
                 {
                     IOperand::Symbol {
-                        id: *symbol_id,
-                        ret_type: *return_type,
+                        id: symbol_id,
+                        ret_type: return_type,
                     }
                 } else {
                     unreachable!()
                 }
             }
             Not => {
-                let child = exp.get_unary_child().unwrap();
+                let child = (*exp.borrow()).get_unary_child().unwrap();
                 let child_exp = self.accept_expression(child);
                 let ret_target = self.make_temp(ReturnType::Bool);
                 let ret_target = IOperand::Symbol {
@@ -173,8 +174,8 @@ impl<'a> IVisitor<'a> {
                 ret_target
             }
             SignMinus => {
-                let child = exp.get_unary_child().unwrap();
-                let ret_type = child.return_type();
+                let child = (*exp.borrow()).get_unary_child().unwrap();
+                let ret_type = (*child.borrow()).return_type();
                 let child_exp = self.accept_expression(child);
                 let ret_target = self.make_temp(ret_type);
                 let ret_target = IOperand::Symbol {
@@ -191,14 +192,14 @@ impl<'a> IVisitor<'a> {
                 ret_target
             }
             SignPlus => {
-                let child = exp.get_unary_child().unwrap();
+                let child = (*exp.borrow()).get_unary_child().unwrap();
                 self.accept_expression(child)
             }
-            _ => unreachable!("Node `{}` is not (part of) an expression", exp),
+            _ => unreachable!("Node `{}` is not (part of) an expression", (*exp.borrow())),
         }
     }
 
-    pub fn visit_function(&mut self, func: &SyntaxNode, func_id: SymbolId) {
+    pub fn visit_function(&mut self, func: SyntaxNodeBox, func_id: SymbolId) {
         if func_id.is_builtin() {
             return;
         }
@@ -216,10 +217,10 @@ impl<'a> IVisitor<'a> {
             operand2: None,
             ret_target: None,
         });
-        self.accept(func);
+        self.accept(func.clone());
         let last_stmt = self.icode.get_last_statement();
         if !last_stmt.is_jump() && !last_stmt.is_recursive_call(&func_id) {
-            self.add_implicit_return(func.return_type());
+            self.add_implicit_return((*func.borrow()).return_type());
         }
     }
 
@@ -237,14 +238,16 @@ impl<'a> IVisitor<'a> {
         })
     }
 
-    fn visit_assignment(&mut self, l_var: &SyntaxNode, r_expr: &SyntaxNode) -> IOperand {
-        log::trace!("Assignment: {} | {}", l_var, r_expr);
-        let common_ret = l_var.return_type().to_base_type();
-        let ret_target = if l_var.node_type() == NodeType::ArrayAccess {
+    fn visit_assignment(&mut self, l_var: SyntaxNodeBox, r_expr: SyntaxNodeBox) -> IOperand {
+        // let l_var = *l_var.borrow();
+        // let r_expr = *r_expr.borrow();
+        log::trace!("Assignment: {} | {}", *l_var.borrow(), *r_expr.borrow());
+        let common_ret = (*l_var.borrow()).return_type().to_base_type();
+        let ret_target = if (*l_var.borrow()).node_type() == NodeType::ArrayAccess {
             self.visit_array_access(l_var)
         } else {
             IOperand::Symbol {
-                id: l_var.symbol_id(),
+                id: (*l_var.borrow()).symbol_id(),
                 ret_type: common_ret,
             }
         };
@@ -261,9 +264,9 @@ impl<'a> IVisitor<'a> {
 
     fn visit_if_else(
         &mut self,
-        cond: &SyntaxNode,
-        if_branch: &SyntaxNode,
-        else_branch: Option<&SyntaxNode>,
+        cond: SyntaxNodeBox,
+        if_branch: SyntaxNodeBox,
+        else_branch: Option<SyntaxNodeBox>,
     ) {
         let cond_expr = self.accept_expression(cond);
         let else_label = self.make_label();
@@ -302,7 +305,7 @@ impl<'a> IVisitor<'a> {
         }
     }
 
-    fn visit_while(&mut self, cond: &SyntaxNode, body: &SyntaxNode) {
+    fn visit_while(&mut self, cond: SyntaxNodeBox, body: SyntaxNodeBox) {
         let loop_cond = self.make_label();
         let loop_body = self.make_label();
         self.icode
@@ -325,8 +328,8 @@ impl<'a> IVisitor<'a> {
         });
     }
 
-    fn visit_func_call(&mut self, func: &SyntaxNode, args: Option<&SyntaxNode>) -> IOperand {
-        let func_id = func.symbol_id();
+    fn visit_func_call(&mut self, func: SyntaxNodeBox, args: Option<SyntaxNodeBox>) -> IOperand {
+        let func_id = (*func.borrow()).symbol_id();
         let ret_type = self.table.get_symbol(&func_id).unwrap().return_type;
         let ret_temp = self.make_temp(ret_type);
         let ret_temp = IOperand::Symbol {
@@ -349,12 +352,12 @@ impl<'a> IVisitor<'a> {
         ret_temp
     }
 
-    fn visit_expr_list(&mut self, expr_list: &SyntaxNode) {
-        let (current_exp_node, next) = expr_list.get_binary_children();
-        if let Some(exp_node) = current_exp_node {
-            let exp = self.accept_expression(exp_node);
+    fn visit_expr_list(&mut self, expr_list: SyntaxNodeBox) {
+        let (current_exp_node, next) = (*expr_list.borrow()).get_binary_children();
+        if let Some(ref exp_node) = current_exp_node {
+            let exp = self.accept_expression(exp_node.clone());
             self.icode.append_statement(IStatement {
-                op_type: exp_node.return_type().into(),
+                op_type: (*exp_node.borrow()).return_type().into(),
                 operator: IOperator::Param,
                 operand1: Some(exp),
                 operand2: None,
@@ -366,7 +369,7 @@ impl<'a> IVisitor<'a> {
         }
     }
 
-    fn visit_return(&mut self, ret: Option<&SyntaxNode>) {
+    fn visit_return(&mut self, ret: Option<SyntaxNodeBox>) {
         let ret_exp = ret.map(|r| self.accept_expression(r));
         self.icode.append_statement(IStatement {
             op_type: IOperatorSize::Void,
@@ -377,11 +380,16 @@ impl<'a> IVisitor<'a> {
         });
     }
 
-    fn visit_array_access(&mut self, node: &SyntaxNode) -> IOperand {
-        let (array, access) = node.get_both_binary_children();
-        log::trace!("Array - array: {}, access: {}", array, access);
-        let array_id = array.symbol_id();
-        let ret_type = array.return_type().to_base_type();
+    fn visit_array_access(&mut self, node: SyntaxNodeBox) -> IOperand {
+        // let n = (*node.borrow());
+        let (array, access) = (*node.borrow()).get_both_binary_children();
+        log::trace!(
+            "Array - array: {}, access: {}",
+            *array.borrow(),
+            *access.borrow()
+        );
+        let array_id = (*array.borrow()).symbol_id();
+        let ret_type = (*array.borrow()).return_type().to_base_type();
         let access_with_offset = self.calc_array_index(ret_type, access);
         let array_access_retval = IOperand::from_symbol(self.make_temp(ret_type), ret_type);
         self.icode.append_statement(IStatement {
@@ -394,7 +402,7 @@ impl<'a> IVisitor<'a> {
         array_access_retval
     }
 
-    fn calc_array_index(&mut self, base_type: ReturnType, access: &SyntaxNode) -> IOperand {
+    fn calc_array_index(&mut self, base_type: ReturnType, access: SyntaxNodeBox) -> IOperand {
         let type_size: usize = IOperatorSize::from(base_type).into();
         let acccess_exp = self.accept_expression(access);
         let access_with_offset = IOperand::from_symbol(self.make_temp(base_type), base_type);

@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use std::collections::VecDeque;
 
 use crate::{
@@ -26,7 +27,7 @@ pub enum ParserValue {
 }
 
 impl From<SyntaxBuilderError> for ParserValue {
-    fn from(e: SyntaxBuilderError) -> Self {
+    fn from(_: SyntaxBuilderError) -> Self {
         Self::Node(SyntaxNode::create_error())
     }
 }
@@ -438,20 +439,25 @@ impl TreeWalker {
                         }
                     })
                     .collect::<VecDeque<SyntaxNode>>();
+                log::trace!(
+                    "List BEFORE: {:#?}",
+                    list.iter().map(|x| x.node_type()).collect_vec()
+                );
                 while list.len() != 1 {
                     let mut highest_prec = 0;
                     let mut highest_prec_idx = 0;
                     list.iter()
-                        .filter(|s| s.is_binop())
-                        .map(|s| s.precedence().unwrap())
+                        .enumerate()
+                        .filter(|(i, _)| i % 2 == 1)
+                        .map(|(_, s)| s.precedence().unwrap())
                         .enumerate()
                         .for_each(|(i, s)| {
+                            log::trace!("idx:{} prec:{}", i, s);
                             if s > highest_prec {
                                 highest_prec = s;
                                 highest_prec_idx = i * 2 + 1;
                             }
                         });
-
                     let mut highest_prec_node = list.remove(highest_prec_idx).unwrap();
                     log::trace!(
                         "Highest idx {} | Highest prec {}",

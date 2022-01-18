@@ -27,7 +27,7 @@ pub struct Visitor {
     builder: SyntaxBuilder,
     errors: Vec<ErrorWithLinenumber>,
     warnings: Vec<WarningWithLinenumber>,
-    current_line: Linenumber,
+    pub current_line: Linenumber,
 }
 
 pub type SyntaxResult = Result<SyntaxNode, SyntaxBuilderError>;
@@ -251,8 +251,8 @@ impl Visitor {
                     current_node = Some(SyntaxNode::Binary {
                         node_type: NodeType::ExpressionList,
                         return_type: ReturnType::Void,
-                        left: Some(Box::new(actual_arg)),
-                        right: current_node.map(Box::new),
+                        left: SyntaxNode::create_child(actual_arg),
+                        right: current_node.map(SyntaxNode::create_boxed),
                     });
                 }
             }
@@ -261,12 +261,12 @@ impl Visitor {
             return self.handle_error(err);
         };
         SyntaxNode::Binary {
-            left: Some(Box::new(SyntaxNode::Symbol {
+            left: SyntaxNode::create_child(SyntaxNode::Symbol {
                 node_type: NodeType::Id,
                 return_type: ReturnType::Void,
                 symbol_id: id,
-            })),
-            right: current_node.map(Box::new),
+            }),
+            right: current_node.map(SyntaxNode::create_boxed),
             node_type: NodeType::FunctionCall,
             return_type: func.return_type,
         }
@@ -311,8 +311,8 @@ impl Visitor {
 
         for node in list.into_iter().rev() {
             stmt_list = Some(SyntaxNode::Binary {
-                left: Some(Box::new(node)),
-                right: stmt_list.map(Box::new),
+                left: SyntaxNode::create_child(node),
+                right: stmt_list.map(SyntaxNode::create_boxed),
                 node_type: NodeType::StatementList,
                 return_type: ReturnType::Void,
             });
@@ -340,7 +340,7 @@ impl Visitor {
             SyntaxNode::Unary {
                 node_type: NodeType::Return,
                 return_type: ret_node.return_type(),
-                child: Some(Box::new(ret_node)),
+                child: SyntaxNode::create_child(ret_node),
             }
         } else {
             SyntaxNode::Unary {
@@ -359,8 +359,8 @@ impl Visitor {
         SyntaxNode::Binary {
             node_type: NodeType::While,
             return_type: ReturnType::Void,
-            left: Some(Box::new(expression)),
-            right: Some(Box::new(statement)),
+            left: SyntaxNode::create_child(expression),
+            right: SyntaxNode::create_child(statement),
         }
     }
 
@@ -379,8 +379,8 @@ impl Visitor {
             SyntaxNode::Binary {
                 node_type: NodeType::IfTargets,
                 return_type: ReturnType::Void,
-                left: Some(Box::new(if_body)),
-                right: Some(Box::new(else_body)),
+                left: SyntaxNode::create_child(if_body),
+                right: SyntaxNode::create_child(else_body),
             }
         } else {
             if_body
@@ -388,8 +388,8 @@ impl Visitor {
         SyntaxNode::Binary {
             node_type: NodeType::If,
             return_type: ReturnType::Void,
-            left: Some(Box::new(condition)),
-            right: Some(Box::new(rchild)),
+            left: SyntaxNode::create_child(condition),
+            right: SyntaxNode::create_child(rchild),
         }
     }
 
@@ -403,8 +403,8 @@ impl Visitor {
         SyntaxNode::Binary {
             node_type: NodeType::Assignment,
             return_type: ret_type.to_base_type(),
-            left: Some(Box::new(lvar)),
-            right: Some(Box::new(exp)),
+            left: SyntaxNode::create_child(lvar),
+            right: SyntaxNode::create_child(exp),
         }
     }
 
@@ -420,10 +420,10 @@ impl Visitor {
                 *return_type = ReturnType::Bool;
                 let unary_child = SyntaxNode::coerce(unary_child, ReturnType::Bool)
                     .unwrap_or_else(|e| self.handle_error(e));
-                *child = Some(Box::new(unary_child))
+                *child = SyntaxNode::create_child(unary_child)
             } else {
                 *return_type = unary_child.return_type();
-                *child = Some(Box::new(unary_child));
+                *child = SyntaxNode::create_child(unary_child);
             }
         }
         op
@@ -462,8 +462,8 @@ impl Visitor {
                 }
                 _ => common_ret_type,
             };
-            *left = Some(Box::new(left_child));
-            *right = Some(Box::new(right_child));
+            *left = SyntaxNode::create_child(left_child);
+            *right = SyntaxNode::create_child(right_child);
         } else {
             self.handle_error(SyntaxBuilderError(format!(
                 "Node {} is not a binary operator",
@@ -507,8 +507,8 @@ impl Visitor {
         SyntaxNode::Binary {
             node_type: NodeType::ArrayAccess,
             return_type: symbol.return_type.to_base_type(),
-            left: Some(Box::new(id_node)),
-            right: Some(Box::new(expr)),
+            left: SyntaxNode::create_child(id_node),
+            right: SyntaxNode::create_child(expr),
         }
     }
 

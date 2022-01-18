@@ -1,6 +1,6 @@
 use crate::{error::SyntaxBuilderError, id::SymbolId, symbol::ReturnType, visitor::SyntaxResult};
 use core::fmt;
-use std::{borrow::Cow, ops::Deref};
+use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 use lazy_static::lazy_static;
 
@@ -214,63 +214,66 @@ impl From<ConstantNodeValue> for i64 {
     }
 }
 
-pub struct PreorderIter<'a> {
-    stack: Vec<&'a SyntaxNode>,
+pub struct PreorderIter {
+    stack: Vec<SyntaxNodeBox>,
 }
 
-impl<'a> PreorderIter<'a> {
-    pub fn new(root: &'a SyntaxNode) -> Self {
+impl PreorderIter {
+    pub fn new(root: SyntaxNodeBox) -> Self {
         Self { stack: vec![root] }
     }
 }
 
-impl<'a> Iterator for PreorderIter<'a> {
-    type Item = &'a SyntaxNode;
+impl Iterator for PreorderIter {
+    type Item = SyntaxNodeBox;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(n) = self.stack.pop() {
-            match *n {
+            let node = &*n.borrow();
+            match node {
                 SyntaxNode::Binary {
                     ref left,
                     ref right,
                     ..
                 } => {
                     if let Some(right) = right {
-                        self.stack.push(right.as_ref());
+                        // let r = right.clone();
+                        self.stack.push(right.clone());
                     }
                     if let Some(left) = left {
-                        self.stack.push(left.as_ref());
+                        self.stack.push(left.clone());
                     }
                 }
                 SyntaxNode::Unary {
-                    child: Some(ref child),
-                    ..
+                    child: Some(child), ..
                 } => {
-                    self.stack.push(child.as_ref());
+                    self.stack.push(child.clone());
                 }
                 _ => {}
             }
-            Some(n)
+            Some(n.clone())
         } else {
             None
         }
     }
 }
 
-pub type SyntaxNodeBox = Option<Box<SyntaxNode>>;
+pub type SyntaxCell = RefCell<SyntaxNode>;
+pub type SyntaxNodeBox = Rc<SyntaxCell>;
+pub type SyntaxNodeChild = Option<SyntaxNodeBox>;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum SyntaxNode {
     Unary {
         node_type: NodeType,
         return_type: ReturnType,
-        child: SyntaxNodeBox,
+        child: SyntaxNodeChild,
     },
     Binary {
         node_type: NodeType,
         return_type: ReturnType,
-        left: SyntaxNodeBox,
-        right: SyntaxNodeBox,
+        left: SyntaxNodeChild,
+        right: SyntaxNodeChild,
     },
     Constant {
         node_type: NodeType,
@@ -291,6 +294,14 @@ impl SyntaxNode {
         SyntaxNode::Error
     }
 
+    pub fn create_child(node: SyntaxNode) -> SyntaxNodeChild {
+        Some(Rc::new(RefCell::new(node)))
+    }
+
+    pub fn create_boxed(node: SyntaxNode) -> SyntaxNodeBox {
+        Rc::new(RefCell::new(node))
+    }
+
     /// Attempt to coerce [SyntaxNode] `from` to [ReturnType] `to`
     /// If the coercion is valid, will return a unary coercion [SyntaxNode] with the `from` node as its child.
     pub fn coerce(from: SyntaxNode, to: ReturnType) -> SyntaxResult {
@@ -306,7 +317,7 @@ impl SyntaxNode {
         // Any type can be coerced to bool or error.
         else if matches!(to, ReturnType::Bool | ReturnType::Error) || from_ret_t < to {
             Ok(SyntaxNode::Unary {
-                child: Some(Box::new(from)),
+                child: SyntaxNode::create_child(from),
                 return_type: to,
                 node_type: NodeType::Coercion,
             })
@@ -348,8 +359,8 @@ impl SyntaxNode {
         }
     }
 
-    pub fn preorder(&self) -> PreorderIter {
-        PreorderIter::new(self)
+    pub fn preorder(root: &SyntaxNodeBox) -> PreorderIter {
+        PreorderIter::new(root.clone())
     }
 
     /*
@@ -384,9 +395,9 @@ impl SyntaxNode {
         }
     }
 
-    pub fn get_binary_children(&self) -> (Option<&SyntaxNode>, Option<&SyntaxNode>) {
+    pub fn get_binary_children(&self) -> (SyntaxNodeChild, SyntaxNodeChild) {
         if let SyntaxNode::Binary { left, right, .. } = self {
-            (left.as_deref(), right.as_deref())
+            (left.as_ref().cloned(), right.as_ref().cloned())
         } else {
             panic!("Node {} was not binary", self);
         }
@@ -394,17 +405,20 @@ impl SyntaxNode {
 
     /// Returns left and right child of a binary node.
     /// Panics if the node is not binary or if either of the two children is [None].
-    pub fn get_both_binary_children(&self) -> (&SyntaxNode, &SyntaxNode) {
+    pub fn get_both_binary_children(&self) -> (SyntaxNodeBox, SyntaxNodeBox) {
         if let SyntaxNode::Binary { left, right, .. } = self {
-            (left.as_ref().unwrap(), right.as_ref().unwrap())
+            (
+                left.as_ref().unwrap().clone(),
+                right.as_ref().unwrap().clone(),
+            )
         } else {
             panic!("Node {} was not binary", self);
         }
     }
 
-    pub fn get_unary_child(&self) -> Option<&SyntaxNode> {
+    pub fn get_unary_child(&self) -> SyntaxNodeChild {
         if let SyntaxNode::Unary { child, .. } = self {
-            child.as_deref()
+            child.as_ref().cloned()
         } else {
             panic!("Node {} was not unary", self);
         }
@@ -435,6 +449,7 @@ impl SyntaxNode {
                 | NodeType::RelGTE
                 | NodeType::RelLT
                 | NodeType::RelLTE
+                | NodeType::Assignment
         )
     }
 }
@@ -481,7 +496,8 @@ impl ptree::TreeItem for SyntaxNode {
         match self {
             Self::Unary { child, .. } => {
                 if let Some(node) = child {
-                    Cow::from(vec![node.deref().clone()])
+                    let x = (*node.as_ref()).borrow().clone();
+                    Cow::from(vec![x])
                 } else {
                     Cow::from(vec![])
                 }
@@ -489,10 +505,12 @@ impl ptree::TreeItem for SyntaxNode {
             Self::Binary { left, right, .. } => {
                 let mut vec: Vec<SyntaxNode> = vec![];
                 if let Some(node) = left {
-                    vec.push(node.deref().clone());
+                    let x = (*node.as_ref()).borrow().clone();
+                    vec.push(x);
                 }
                 if let Some(node) = right {
-                    vec.push(node.deref().clone());
+                    let x = (*node.as_ref()).borrow().clone();
+                    vec.push(x);
                 }
                 Cow::from(vec)
             }
@@ -504,7 +522,7 @@ impl ptree::TreeItem for SyntaxNode {
 }
 
 impl From<SyntaxBuilderError> for SyntaxNode {
-    fn from(err: SyntaxBuilderError) -> Self {
+    fn from(_: SyntaxBuilderError) -> Self {
         Self::Error
     }
 }

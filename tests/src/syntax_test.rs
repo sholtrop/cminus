@@ -1,5 +1,5 @@
 use std::io;
-use syntax::{NodeType, SyntaxAnalysisResult};
+use syntax::{NodeType, SyntaxAnalysisResult, SyntaxNode};
 use tests::{collect_tests_in_path, run_single_test, TestStats};
 
 const PROGRAM_TEST_PATH: &str = "tests/testfiles/general/programs";
@@ -8,7 +8,7 @@ const SYNTAX_TEST_PATH: &str = "tests/testfiles/syntax";
 
 mod specific_tests {
     use itertools::{self, EitherOrBoth, Itertools};
-    use syntax::SyntaxNode;
+    use syntax::{SyntaxNode, SyntaxNodeBox};
 
     const GLOBAL_PREFIX: &str = "tests/testfiles/general/units/";
     fn read_to_string(path: &str) -> String {
@@ -17,7 +17,7 @@ mod specific_tests {
 
     fn syntax_similar<'a>(
         expectation: impl IntoIterator<Item = &'a str>,
-        actual: impl IntoIterator<Item = &'a SyntaxNode>,
+        actual: impl IntoIterator<Item = SyntaxNodeBox>,
     ) -> bool {
         for (idx, pair) in expectation
             .into_iter()
@@ -26,18 +26,18 @@ mod specific_tests {
         {
             match pair {
                 EitherOrBoth::Both(l, r) => {
-                    if l != r.to_string() {
+                    if l != (*r.borrow()).to_string() {
                         log::error!(
                             "Nodes not similar at position {}. Expected: `{}` | Actual: `{}`",
                             idx + 1,
                             l,
-                            r
+                            *r.borrow()
                         );
                         return false;
                     }
                 }
                 EitherOrBoth::Right(r) => {
-                    log::error!("Syntax was not similar: Actual had more nodes than expected tree. Last actual node: {}", r);
+                    log::error!("Syntax was not similar: Actual had more nodes than expected tree. Last actual node: {}", (*r.borrow()));
                     return false;
                 }
                 EitherOrBoth::Left(l) => {
@@ -92,6 +92,8 @@ mod specific_tests {
     }
 
     pub mod node_coercion {
+        use syntax::SyntaxTree;
+
         use super::*;
         const PREFIX: &str = "tests/testfiles/syntax/node/correct/coercion/";
 
@@ -105,7 +107,7 @@ mod specific_tests {
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
             assert!(main.tree.is_some());
-            let tree = main.tree.as_ref().unwrap().preorder();
+            let tree = SyntaxNode::preorder(main.tree.as_ref().unwrap());
             let expectation = [
                 "statement_list - void",
                     "assignment - int",
@@ -146,7 +148,7 @@ mod specific_tests {
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
             assert!(main.tree.is_some());
-            let tree = main.tree.as_ref().unwrap().preorder();
+            let tree = SyntaxNode::preorder(main.tree.as_ref().unwrap());
             let expectation = [
                 "statement_list - void",
                     "assignment - int",
@@ -194,7 +196,7 @@ mod specific_tests {
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
             assert!(main.tree.is_some());
-            let tree = main.tree.as_ref().unwrap().preorder();
+            let tree = SyntaxNode::preorder(main.tree.as_ref().unwrap());
             assert!(syntax_similar(["[EMPTY]"], tree));
             true
         }
@@ -209,7 +211,7 @@ mod specific_tests {
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
             assert!(main.tree.is_some());
-            let tree = main.tree.as_ref().unwrap().preorder();
+            let tree = SyntaxNode::preorder(main.tree.as_ref().unwrap());
             let expectation = [
                 "statement_list - void",
                     "function_call - void", // writeinteger
@@ -236,7 +238,7 @@ mod specific_tests {
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
             assert!(main.tree.is_some());
-            let tree = main.tree.as_ref().unwrap().preorder();
+            let tree = SyntaxNode::preorder(main.tree.as_ref().unwrap());
             let expectation = [
                 "statement_list - void",
                     "assignment - int",
@@ -262,7 +264,7 @@ mod specific_tests {
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
             assert!(main.tree.is_some());
-            let tree = main.tree.as_ref().unwrap().preorder();
+            let tree = SyntaxNode::preorder(main.tree.as_ref().unwrap());
             let expectation = [
                 "statement_list - void",
                     "if - void",
@@ -306,7 +308,7 @@ mod specific_tests {
             let result = result.unwrap();
             let main = result.tree.get_func_by_name("main").unwrap();
             assert!(main.tree.is_some());
-            let tree = main.tree.as_ref().unwrap().preorder();
+            let tree = SyntaxNode::preorder(main.tree.as_ref().unwrap());
             let expectation = [
                 "statement_list - void",
                     "assignment - int",
@@ -355,15 +357,11 @@ pub fn test_function(input: &str) -> Result<(), &str> {
         return Err("Errors present");
     }
     for (id, func) in tree.functions {
-        for node in func
-            .tree
-            .ok_or_else(|| {
-                log::error!("Rootless function {}", id);
-                "Error occurred"
-            })?
-            .preorder()
-        {
-            if node.node_type() == NodeType::Error {
+        for node in SyntaxNode::preorder(&func.tree.ok_or_else(|| {
+            log::error!("Rootless function {}", id);
+            "Error occurred"
+        })?) {
+            if (*node.borrow()).node_type() == NodeType::Error {
                 return Err("Error node found");
             }
         }
@@ -391,7 +389,7 @@ pub fn run() -> io::Result<()> {
     log::info!("Running specific tests...");
     let mut spec_stats = TestStats {
         success: 0,
-        total: 0
+        total: 0,
     };
     for test in specific_tests::ALL_TESTS {
         spec_stats.total += 1;

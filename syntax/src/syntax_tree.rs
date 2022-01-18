@@ -6,6 +6,7 @@ use crate::node::TESTING;
 use crate::{
     id::{SymbolId, SymbolName},
     node::SyntaxNode,
+    node::SyntaxNodeBox,
 };
 
 pub enum NodeChildren {
@@ -15,7 +16,7 @@ pub enum NodeChildren {
 
 pub struct FunctionRoot {
     pub name: SymbolName,
-    pub tree: Option<SyntaxNode>,
+    pub tree: Option<SyntaxNodeBox>,
 }
 
 #[derive(Default)]
@@ -37,8 +38,8 @@ impl SyntaxTree {
         }
     }
 
-    pub fn get_root(&self, id: &SymbolId) -> Option<&SyntaxNode> {
-        self.functions.get(id)?.tree.as_ref()
+    pub fn get_root(&self, id: &SymbolId) -> Option<SyntaxNodeBox> {
+        self.functions.get(id)?.tree.clone()
     }
 
     /// For tests
@@ -65,7 +66,7 @@ impl fmt::Display for SyntaxTree {
             }
             if let Some(tree) = &func.tree {
                 let mut buff = vec![];
-                ptree::write_tree_with(tree, &mut buff, &SyntaxTree::get_print_config())
+                ptree::write_tree_with(&*tree.borrow(), &mut buff, &SyntaxTree::get_print_config())
                     .expect("Error printing tree");
                 let tree = String::from_utf8(buff).expect("Utf8 error printing tree");
                 writeln!(f, "{}", tree)?;

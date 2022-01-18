@@ -4,6 +4,7 @@ use crate::{
     error::SyntaxBuilderError,
     id::{SymbolId, SymbolName},
     node::SyntaxNode,
+    node::SyntaxNodeBox,
     scope::ScopeManager,
     symbol::Symbol,
     symbol_table::{SymbolScope, SymbolTable},
@@ -49,9 +50,13 @@ impl SyntaxBuilder {
         let name = symbol.name.clone();
         let id = self.add_function(symbol)?;
         self.current_function = Some(id);
-        self.tree
-            .functions
-            .insert(id, FunctionRoot { name, tree: None });
+        self.tree.functions.insert(
+            id,
+            FunctionRoot {
+                name,
+                tree: Option::<SyntaxNodeBox>::None,
+            },
+        );
         Ok(id)
     }
 
@@ -98,7 +103,7 @@ impl SyntaxBuilder {
             )
         });
         log::trace!("ATTACH ROOT {}", func_id);
-        func_root.tree = Some(new_root);
+        func_root.tree = Some(SyntaxNode::create_boxed(new_root));
         Ok(())
     }
 
