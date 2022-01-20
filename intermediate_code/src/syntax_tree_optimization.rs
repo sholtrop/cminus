@@ -1,8 +1,6 @@
-use std::cell::RefCell;
-
 use syntax::{ConstantNodeValue, NodeType, SyntaxNode, SyntaxTree};
 
-pub fn propagate_constants(tree: &mut SyntaxTree) {}
+// pub fn propagate_constants(tree: &mut SyntaxTree) {}
 
 pub fn fold_constants(tree: &mut SyntaxTree) {
     log::debug!("Fold constants");

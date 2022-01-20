@@ -177,15 +177,15 @@ impl SymbolTable {
         symbols
     }
 
-    pub fn get_func_var_ids(&self, func_id: SymbolId) -> Option<&Vec<SymbolId>> {
-        let vars = &self.functions.get(&func_id)?.variables;
+    pub fn get_func_var_ids(&self, func_id: &SymbolId) -> Option<&Vec<SymbolId>> {
+        let vars = &self.functions.get(func_id)?.variables;
         Some(vars)
     }
 
-    pub fn get_func_var_symbols(&self, func_id: SymbolId) -> Option<Vec<Symbol>> {
+    pub fn get_func_var_symbols(&self, func_id: &SymbolId) -> Option<Vec<(SymbolId, &Symbol)>> {
         let mut symbols = Vec::new();
         for id in self.get_func_var_ids(func_id)? {
-            symbols.push(self.symbols.get(id)?.symbol.clone());
+            symbols.push((*id, &self.symbols.get(id)?.symbol));
         }
         Some(symbols)
     }

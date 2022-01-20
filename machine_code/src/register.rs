@@ -8,13 +8,16 @@ pub struct Register {
 }
 
 impl Register {
-    pub fn new(name: RegisterName, optype: IOperatorSize) -> Self {
-        Self { name, optype }
+    pub fn new(name: RegisterName, opsize: IOperatorSize) -> Self {
+        Self {
+            name,
+            optype: opsize,
+        }
     }
 }
 
-pub fn reg(name: RegisterName, optype: IOperatorSize) -> Register {
-    Register::new(name, optype)
+pub fn reg(name: RegisterName, opsize: IOperatorSize) -> Register {
+    Register::new(name, opsize)
 }
 
 /// Uniquely identifies an x86 register by its 64-bit name.

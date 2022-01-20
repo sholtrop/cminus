@@ -48,6 +48,7 @@ pub mod asm {
         SetAE, // set if >= unsigned
         SetB,  // set if < unsigned
         SetBE, // set if <= unsigned
+        Leave,
     }
 
     impl fmt::Display for Op {
@@ -97,6 +98,7 @@ pub mod asm {
                     SetAE => "setae".into(),
                     SetB => "setb".into(),
                     SetBE => "setbe".into(),
+                    Leave => "leave".into(),
                 }
             )
         }
@@ -139,7 +141,7 @@ pub mod asm {
                     Self::Immediate(i) => format!("${}", i),
                     Self::Register(r) => r.to_string(),
                     Self::Label(l) => l.to_string(),
-                    Self::Stack(o) => format!("{}%rbp", o.0),
+                    Self::Stack(o) => format!("{}(%rbp)", o),
                 }
             )
         }
@@ -148,7 +150,7 @@ pub mod asm {
         fn from(loc: &StoredLocation) -> Self {
             match loc {
                 StoredLocation::Global(g) => Src::Global(g.to_string()),
-                StoredLocation::Reg(r) => Src::Register(*r),
+                StoredLocation::Reg(r) | StoredLocation::TempReg(r, _) => Src::Register(*r),
                 StoredLocation::Stack(s) => Src::Stack(*s),
             }
         }
@@ -168,7 +170,7 @@ pub mod asm {
         fn from(loc: &StoredLocation) -> Self {
             match loc {
                 StoredLocation::Global(g) => Dest::Global(g.to_string()),
-                StoredLocation::Reg(r) => Dest::Register(*r),
+                StoredLocation::Reg(r) | StoredLocation::TempReg(r, _) => Dest::Register(*r),
                 StoredLocation::Stack(s) => Dest::Stack(*s),
             }
         }
@@ -189,7 +191,7 @@ pub mod asm {
                     Self::None => "".into(),
                     Self::Register(r) => r.to_string(),
                     Self::Global(s) => format!("v{}(%rip)", s),
-                    Self::Stack(offset) => format!("{}(%rsp)", offset.0),
+                    Self::Stack(o) => format!("{}(%rbp)", o),
                     Self::Label(l) => l.to_string(),
                     Self::Immediate(v) => format!("${}", v),
                 }

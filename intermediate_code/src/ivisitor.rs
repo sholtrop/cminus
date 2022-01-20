@@ -100,15 +100,7 @@ impl<'a> IVisitor<'a> {
                     IOperator::from(ntype)
                 };
                 let l_expr = self.accept_expression(l);
-                let mut r_expr = self.accept_expression(r);
-
-                // if matches!(ntype, Div | Mod) {
-                //     // Div and Mod require the divisor to be in a register
-                //     if let IOperand::Immediate { ret_type, .. } = r_expr {
-                //         let temp = self.make_temp(ret_type);
-                //         r_expr = IOperand::Symbol { id: temp, ret_type };
-                //     }
-                // }
+                let r_expr = self.accept_expression(r);
 
                 let ret = self.make_temp(ret_type);
                 let ret_target = IOperand::Symbol { id: ret, ret_type };
@@ -214,7 +206,6 @@ impl<'a> IVisitor<'a> {
             let l_expr = self.accept_expression(l);
             let r_expr = self.accept_expression(r);
             let op = IOperator::from(ntype).to_jump();
-            log::debug!("Condop: {} | ntype: {}", op, ntype);
             (op, l_expr, r_expr)
         } else if ntype == NodeType::Coercion {
             let l = (*exp.borrow()).get_unary_child().unwrap();

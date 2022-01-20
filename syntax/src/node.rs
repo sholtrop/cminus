@@ -527,7 +527,7 @@ impl SyntaxNode {
             SyntaxNode::Unary { node_type, .. }
             | SyntaxNode::Binary { node_type, .. }
             | SyntaxNode::Constant { node_type, .. }
-            | SyntaxNode::Symbol { node_type, .. } => node_type.clone(),
+            | SyntaxNode::Symbol { node_type, .. } => *node_type,
             SyntaxNode::Empty => NodeType::Empty,
             SyntaxNode::Error => NodeType::Error,
         }

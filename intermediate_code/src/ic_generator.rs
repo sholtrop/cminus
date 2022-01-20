@@ -18,7 +18,7 @@ pub struct Intermediate {
     pub graph: FlowGraph,
 }
 
-fn preprocess(tree: &mut SyntaxTree, table: &mut SymbolTable) {
+fn preprocess(tree: &mut SyntaxTree, _: &mut SymbolTable) {
     syntax_tree_optimization::fold_constants(tree);
 }
 

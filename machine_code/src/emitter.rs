@@ -11,7 +11,7 @@ use syntax::{ConstantNodeValue, ReturnType, SymbolId, SymbolName, SymbolTable, S
 use crate::{
     assembly::asm::*,
     output::{self, OutStream},
-    reg_alloc::{RegAlloc, RW},
+    reg_alloc::{AllocType, RegAlloc, StoredLocation},
     register::{reg, RegisterName::*},
 };
 
@@ -133,6 +133,15 @@ impl<'a> CodeEmitter<'a> {
         self.write(&format!("{}:\n", name));
         self.emit_prologue();
         let params = self.table.get_func_param_ids(id).unwrap();
+        let locals_size = self.reg_alloc.alloc_stack_locals(id);
+        if locals_size.0 > 0 {
+            let instr = instr(
+                Op::Sub(Quad),
+                Src::Immediate(ConstantNodeValue::from(locals_size.0 as i64)),
+                reg(Rsp, Quad),
+            );
+            self.write(&instr);
+        }
         self.reg_alloc.alloc_func_params(params);
     }
 
@@ -148,9 +157,8 @@ impl<'a> CodeEmitter<'a> {
 
     /// Emits a function epilogue
     pub fn emit_epilogue(&self) {
-        let rbp = reg(Rbp, Quad);
-        let pop_rbp = instr(Op::Pop(Quad), rbp, Dest::None);
-        self.write(&pop_rbp);
+        let leave = instr(Op::Leave, Src::None, Dest::None);
+        self.write(&leave);
         self.write(&instr(Op::Ret, Src::None, Dest::None));
     }
 
@@ -176,7 +184,7 @@ impl<'a> CodeEmitter<'a> {
         let src = match value {
             IOperand::Immediate { value, .. } => Src::Immediate(*value),
             IOperand::Symbol { id, .. } => {
-                let loc = self.reg_alloc.alloc_var(id, RW::Read);
+                let loc = self.reg_alloc.alloc_var(id, AllocType::Read);
                 loc.into()
             }
             _ => panic!("Unknown operand value {}", value),
@@ -193,7 +201,7 @@ impl<'a> CodeEmitter<'a> {
         if let Some(ret) = ret {
             if func_ret_size != IOperatorSize::Void {
                 let size = self.table.get_symbol(ret).unwrap().return_type.into();
-                let dest = self.reg_alloc.alloc_var(ret, RW::Write);
+                let dest = self.reg_alloc.alloc_var(ret, AllocType::Write);
                 let rax = reg(Rax, func_ret_size);
                 let instr = instr(Op::Mov(size), rax, &dest);
                 self.write(&instr);
@@ -217,7 +225,7 @@ impl<'a> CodeEmitter<'a> {
         let dest_type = self.table.get_symbol(dest).unwrap().return_type;
         let src_size = src_type.into();
         let dest_size: IOperatorSize = dest_type.into();
-        let dest = self.reg_alloc.alloc_var(dest, RW::Write);
+        let dest = self.reg_alloc.alloc_var(dest, AllocType::Write);
 
         if is_immediate {
             let instr = instr(Op::Mov(dest_size), src, &dest);
@@ -260,7 +268,7 @@ impl<'a> CodeEmitter<'a> {
         let (lhs, ret_type) = self.get_source(lhs);
         let size = ret_type.into();
         let (rhs, _) = self.get_source(rhs);
-        let ret = self.reg_alloc.alloc_var(ret, RW::Write);
+        let ret = self.reg_alloc.alloc_var(ret, AllocType::Write);
 
         if let Src::Immediate(x) = lhs {
             if let Src::Immediate(y) = rhs {
@@ -279,7 +287,7 @@ impl<'a> CodeEmitter<'a> {
     pub fn emit_assign(&mut self, src: &IOperand, dest: &SymbolId) {
         let (src, src_ret) = self.get_source(src);
         log::trace!("{} {}", src, src_ret);
-        let dest = self.reg_alloc.alloc_var(dest, RW::Write);
+        let dest = self.reg_alloc.alloc_var(dest, AllocType::Write);
         let instr = instr(Op::Mov(src_ret.into()), src, &dest);
         self.write(&instr);
     }
@@ -288,7 +296,7 @@ impl<'a> CodeEmitter<'a> {
         let (lhs, ret_type) = self.get_source(lhs);
         let size = ret_type.into();
         let (rhs, _) = self.get_source(rhs);
-        let ret = self.reg_alloc.alloc_var(ret, RW::Write);
+        let ret = self.reg_alloc.alloc_var(ret, AllocType::Write);
 
         if let Src::Immediate(x) = lhs {
             if let Src::Immediate(y) = rhs {
@@ -309,7 +317,7 @@ impl<'a> CodeEmitter<'a> {
         let (lhs, ret_type) = self.get_source(lhs);
         let size = ret_type.into();
         let (rhs, _) = self.get_source(rhs);
-        let ret = self.reg_alloc.alloc_var(ret, RW::Write);
+        let ret = self.reg_alloc.alloc_var(ret, AllocType::Write);
         if let Src::Immediate(x) = lhs {
             if let Src::Immediate(y) = rhs {
                 // Constant-fold two immediates
@@ -331,16 +339,18 @@ impl<'a> CodeEmitter<'a> {
 
     pub fn emit_div_mod(&mut self, lhs: &IOperand, rhs: &IOperand, ret: &SymbolId, op: &IOperator) {
         let (lhs, _) = self.get_source(lhs);
-        let (rhs, _) = self.get_source(rhs);
+        // divisor must be in a register
+        let (rhs, _) = self.get_reg_source(rhs);
+
         let mov_instr = instr(Op::Mov(Double), lhs, reg(Rax, Double));
         self.write(&mov_instr);
         let edx = reg(Rdx, Double);
         let xor_instr = instr(Op::Xor(Double), edx, edx);
         self.write(&xor_instr);
-        let div_instr = instr(Op::Div, rhs, Dest::None);
+        let div_instr = instr(Op::Div, &rhs, Dest::None);
         self.write(&div_instr);
         let ret_size = self.table.get_symbol(ret).unwrap().return_type.into();
-        let dest = self.reg_alloc.alloc_var(ret, RW::Write);
+        let dest = self.reg_alloc.alloc_var(ret, AllocType::Write);
         let ret_val = if *op == IOperator::Mod {
             reg(Rdx, ret_size)
         } else if *op == IOperator::Div {
@@ -350,6 +360,10 @@ impl<'a> CodeEmitter<'a> {
         };
         let mov_to_ret = instr(Op::Mov(ret_size), ret_val, &dest);
         self.write(&mov_to_ret);
+
+        if let StoredLocation::TempReg(_, id) = rhs {
+            self.reg_alloc.free_temp(&id);
+        }
     }
 
     pub fn emit_set(
@@ -362,7 +376,7 @@ impl<'a> CodeEmitter<'a> {
         let (l, ret) = self.get_source(lhs);
         let (r, _) = self.get_source(rhs);
         let size = ret.into();
-        let dest = self.reg_alloc.alloc_var(dest, RW::Write);
+        let dest = self.reg_alloc.alloc_var(dest, AllocType::Write);
         let op = match *set_type {
             IOperator::SetE => Op::SetE,
             IOperator::SetNE => Op::SetNE,
@@ -387,8 +401,23 @@ impl<'a> CodeEmitter<'a> {
         match *src {
             IOperand::Immediate { value, ret_type } => (Src::Immediate(value), ret_type),
             IOperand::Symbol { id, ret_type } => {
-                let r = self.reg_alloc.alloc_var(&id, RW::Read);
+                let r = self.reg_alloc.alloc_var(&id, AllocType::Read);
                 (r.into(), ret_type)
+            }
+            IOperand::Unknown => unreachable!(),
+        }
+    }
+
+    fn get_reg_source(&mut self, src: &IOperand) -> (StoredLocation, ReturnType) {
+        match *src {
+            IOperand::Immediate { ret_type, .. } => {
+                let (id, regname) = self.reg_alloc.alloc_temp();
+                let reg = reg(regname, ret_type.into());
+                (StoredLocation::TempReg(reg, id), ret_type)
+            }
+            IOperand::Symbol { id, ret_type } => {
+                let reg = self.reg_alloc.alloc_var(&id, AllocType::ReadReg);
+                (reg, ret_type)
             }
             IOperand::Unknown => unreachable!(),
         }
