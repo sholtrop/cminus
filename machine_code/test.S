@@ -3,21 +3,21 @@
 main:
 	pushq	%rbp
 	movq	%rsp, %rbp
-	movl	$0, %r10d
-	movl	%r10d, %r11d
-	jmp	.L0
-.L1:
-	movl	$1, %r12d
-	movl	%r11d, %r13d
-	addl	%r12d, %r13d
-	movl	%r13d, %r11d
-.L0:
-	movl	$10, %r14d
-	cmpl	%r11d, %r14d
-	setl	%r15b
-	cmpb	$1, %r15b
-	jne	.L1
-	movl	%r11d, %eax
+	movl	$0, %r12d
+	movl	%r12d, %r13d
+	jmp	.L10
+.L11:
+	movl	$1, %r14d
+	movl	%r13d, %r15d
+	addl	%r14d, %r15d
+	movl	%r15d, %r13d
+	movl	%r13d, %edi
+	call	writeinteger
+.L10:
+	movl	$10, %r12d
+	cmpl	%r12d, %r13d
+	jl	.L11
+	movl	%r13d, %eax
 	popq	%rbp
 	ret
 .LC0:

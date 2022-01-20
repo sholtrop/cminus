@@ -12,6 +12,13 @@
       "stopOnEntry": true
     },
     {
+      "type": "gdb",
+      "request": "launch",
+      "name": "GDB",
+      "program": "${workspaceFolder}/${command:AskForProgramName}",
+      "stopOnEntry": true
+    },
+    {
       "type": "lldb",
       "request": "launch",
       "name": "Debug unit tests in library 'lexical'",
@@ -128,9 +135,9 @@
         }
       },
       "env": {
-        "RUST_LOG": "intermediate_code=trace"
+        "RUST_LOG": "intermediate_code=trace, syntax=debug"
       },
-      "args": ["-g", "graph.dot", "test.c"],
+      "args": ["test.c"],
       "cwd": "${workspaceFolder}/intermediate_code"
     },
     {
@@ -163,8 +170,8 @@
           "kind": "bin"
         }
       },
-      "args": [],
-      "cwd": "${workspaceFolder}"
+      "args": ["test.c"],
+      "cwd": "${workspaceFolder}/machine_code"
     },
     {
       "type": "lldb",

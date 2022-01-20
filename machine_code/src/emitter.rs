@@ -32,6 +32,7 @@ pub struct CodeEmitter<'a> {
     reg_alloc: RegAlloc<'a>,
     table: &'a SymbolTable,
     line: ICLineNumber,
+    current_func: Option<SymbolId>,
 }
 
 impl<'a> CodeEmitter<'a> {
@@ -41,6 +42,7 @@ impl<'a> CodeEmitter<'a> {
             reg_alloc,
             table,
             line: ICLineNumber(1),
+            current_func: None,
         }
     }
 
@@ -63,7 +65,8 @@ impl<'a> CodeEmitter<'a> {
         &mut self,
         jump_type: &IOperator,
         label: &SymbolId,
-        expr: &IOperand,
+        l_exp: &IOperand,
+        r_exp: Option<&IOperand>,
     ) {
         let op = match *jump_type {
             IOperator::Je | IOperator::Jz => Op::Je,
@@ -78,12 +81,34 @@ impl<'a> CodeEmitter<'a> {
             IOperator::Jle => Op::Jle,
             _ => unreachable!(),
         };
-        let (l, ret) = self.get_source(expr);
-        let comp_instr = instr2(
-            Op::Comp(ret.into()),
-            Src::Immediate(ConstantNodeValue::Uint8(1)),
-            l,
-        );
+        log::trace!("JUMP {} {:?}", l_exp, r_exp);
+        let (l, ret) = self.get_source(l_exp);
+        let r = if let Some(r_exp) = r_exp {
+            self.get_source(r_exp).0
+        } else {
+            assert_eq!(op, Op::Jne);
+            Src::Immediate(ConstantNodeValue::from(0))
+        };
+        if let Src::Immediate(l) = l {
+            if let Src::Immediate(r) = r {
+                // Fold two constants because a cmp instruction cannot operate on two constants
+                let holds = match op {
+                    Op::Je => l == r,
+                    Op::Jne => l != r,
+                    Op::Ja | Op::Jg => l > r,
+                    Op::Jae | Op::Jge => l >= r,
+                    Op::Jb | Op::Jl => l < r,
+                    Op::Jbe | Op::Jle => l <= r,
+                    _ => unreachable!(),
+                };
+                if holds {
+                    self.emit_goto(label);
+                }
+                return;
+            }
+        }
+        // AT&T syntax means l and r are reversed for cmp
+        let comp_instr = instr2(Op::Comp(ret.into()), r, l);
         self.write(&comp_instr);
         let label_name = self.get_label_name(label);
         let jump_instr = instr(op, Src::Label(label_name.to_string()), Dest::None);
@@ -102,6 +127,7 @@ impl<'a> CodeEmitter<'a> {
     }
 
     pub fn emit_func(&mut self, id: &SymbolId) {
+        self.current_func = Some(*id);
         let name = self.table.get_symbol(id).unwrap().name.clone().0;
         self.write(&Directive::Global(name.clone()));
         self.write(&format!("{}:\n", name));
@@ -165,11 +191,13 @@ impl<'a> CodeEmitter<'a> {
         let func_ret_size = func_sym.return_type.into();
         self.write(&instr(Op::Call, Src::Label(func_name), Dest::None));
         if let Some(ret) = ret {
-            let size = self.table.get_symbol(ret).unwrap().return_type.into();
-            let dest = self.reg_alloc.alloc_var(ret, RW::Write);
-            let rax = reg(Rax, func_ret_size);
-            let instr = instr(Op::Mov(size), rax, &dest);
-            self.write(&instr);
+            if func_ret_size != IOperatorSize::Void {
+                let size = self.table.get_symbol(ret).unwrap().return_type.into();
+                let dest = self.reg_alloc.alloc_var(ret, RW::Write);
+                let rax = reg(Rax, func_ret_size);
+                let instr = instr(Op::Mov(size), rax, &dest);
+                self.write(&instr);
+            }
         }
         self.reg_alloc.free_param_regs();
     }
@@ -199,18 +227,12 @@ impl<'a> CodeEmitter<'a> {
         match Self::get_cast_type(src_type, dest_type) {
             CastType::Downcast => {
                 // Downcast can only be x -> boolean
-                let zero = match src_type {
-                    ReturnType::Int8 => ConstantNodeValue::Int8(0),
-                    ReturnType::Int => ConstantNodeValue::Int(0),
-                    ReturnType::Uint8 => ConstantNodeValue::Uint8(0),
-                    ReturnType::Uint => ConstantNodeValue::Uint(0),
-                    _ => unreachable!(),
-                };
+                let zero = ConstantNodeValue::from(0);
                 let instr_cmp = instr(Op::Comp(src_size), src, Dest::Immediate(zero));
-                let setne_src: Src = dest.into();
-                let instr_setne = instr(Op::Setne, setne_src, Dest::None);
+                // let setne_src: Src = dest.into();
+                // let instr_setne = instr(Op::Setne, setne_src, Dest::None);
                 self.write(&instr_cmp);
-                self.write(&instr_setne);
+                // self.write(&instr_setne);
             }
             CastType::Reinterpret => {
                 log::trace!("Reinterpret cast");
@@ -282,6 +304,54 @@ impl<'a> CodeEmitter<'a> {
         };
     }
 
+    pub fn emit_mul(&mut self, lhs: &IOperand, rhs: &IOperand, ret: &SymbolId) {
+        let is_unsigned = lhs.ret_type().is_unsigned();
+        let (lhs, ret_type) = self.get_source(lhs);
+        let size = ret_type.into();
+        let (rhs, _) = self.get_source(rhs);
+        let ret = self.reg_alloc.alloc_var(ret, RW::Write);
+        if let Src::Immediate(x) = lhs {
+            if let Src::Immediate(y) = rhs {
+                // Constant-fold two immediates
+                let instr = instr(Op::Mov(size), Src::Immediate(x * y), &ret);
+                self.write(&instr);
+            }
+        } else {
+            let op = if is_unsigned {
+                Op::Mul(size)
+            } else {
+                Op::IMul(size)
+            };
+            let instr1 = instr(Op::Mov(size), lhs, &ret);
+            let instr2 = instr(op, rhs, &ret);
+            self.write(&instr1);
+            self.write(&instr2);
+        };
+    }
+
+    pub fn emit_div_mod(&mut self, lhs: &IOperand, rhs: &IOperand, ret: &SymbolId, op: &IOperator) {
+        let (lhs, _) = self.get_source(lhs);
+        let (rhs, _) = self.get_source(rhs);
+        let mov_instr = instr(Op::Mov(Double), lhs, reg(Rax, Double));
+        self.write(&mov_instr);
+        let edx = reg(Rdx, Double);
+        let xor_instr = instr(Op::Xor(Double), edx, edx);
+        self.write(&xor_instr);
+        let div_instr = instr(Op::Div, rhs, Dest::None);
+        self.write(&div_instr);
+        let ret_size = self.table.get_symbol(ret).unwrap().return_type.into();
+        let dest = self.reg_alloc.alloc_var(ret, RW::Write);
+        let ret_val = if *op == IOperator::Mod {
+            reg(Rdx, ret_size)
+        } else if *op == IOperator::Div {
+            reg(Rax, ret_size)
+        } else {
+            unreachable!()
+        };
+        let mov_to_ret = instr(Op::Mov(ret_size), ret_val, &dest);
+        self.write(&mov_to_ret);
+    }
+
     pub fn emit_set(
         &mut self,
         set_type: &IOperator,
@@ -307,7 +377,7 @@ impl<'a> CodeEmitter<'a> {
             _ => unreachable!(),
         };
         log::trace!("COMP; {} {}", l, r);
-        let cmp_instr = instr2(Op::Comp(size), l, r);
+        let cmp_instr = instr2(Op::Comp(size), r, l);
         self.write(&cmp_instr);
         let set_instr = instr(op, &dest, Dest::None);
         self.write(&set_instr);

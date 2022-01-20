@@ -5,6 +5,7 @@ use std::fmt;
 use crate::node::TESTING;
 use crate::{
     id::{SymbolId, SymbolName},
+    node::PostorderIter,
     node::SyntaxNode,
     node::SyntaxNodeBox,
 };
@@ -52,6 +53,15 @@ impl SyntaxTree {
             indent: 5,
             ..Default::default()
         }
+    }
+
+    pub fn postorder_traverse(&mut self) -> Vec<PostorderIter> {
+        let mut iters = vec![];
+        for (_, f) in self.functions.iter().filter(|(id, _)| !id.is_builtin()) {
+            let iter = SyntaxNode::postorder(f.tree.as_ref().unwrap());
+            iters.push(iter)
+        }
+        iters
     }
 }
 

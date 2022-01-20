@@ -68,7 +68,7 @@ impl Register {
                 IOperatorSize::Byte | IOperatorSize::Word => "",
                 IOperatorSize::Double => "e",
                 IOperatorSize::Quad => "r",
-                _ => unreachable!(),
+                _ => unreachable!("Size was {}", self.optype),
             },
         }
         .to_string()

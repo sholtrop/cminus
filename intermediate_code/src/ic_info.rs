@@ -37,7 +37,6 @@ impl From<&IntermediateCode> for ICInfo {
         let mut statements = icode.into_iter().peekable();
         let mut current_func = None;
         while let Some((line, stmt)) = statements.next() {
-            log::trace!("{} - {}", line, stmt);
             if stmt.is_label() {
                 info.leaders.insert(line);
                 let id = stmt.label_id();

@@ -92,7 +92,6 @@ mod specific_tests {
     }
 
     pub mod node_coercion {
-        use syntax::SyntaxTree;
 
         use super::*;
         const PREFIX: &str = "tests/testfiles/syntax/node/correct/coercion/";

@@ -1,6 +1,6 @@
 pub mod asm {
     use std::fmt;
-
+    #[derive(Debug, PartialEq)]
     pub enum Op {
         Mov(IOperatorSize),
         Push(IOperatorSize),
@@ -11,7 +11,10 @@ pub mod asm {
         Comp(IOperatorSize),
         Setne,
         Test(IOperatorSize),
-
+        Mul(IOperatorSize),
+        IMul(IOperatorSize),
+        Xor(IOperatorSize),
+        Div,
         // Mov with sign-extension
         Movs(IOperatorSize, IOperatorSize),
 
@@ -62,9 +65,13 @@ pub mod asm {
                     Comp(s) => format!("cmp{}", s),
                     Setne => "setne".into(),
                     Test(s) => format!("test{}", s),
+                    Mul(s) => format!("mul{}", s),
+                    IMul(s) => format!("imul{}", s),
+                    Xor(s) => format!("xor{}", s),
                     Movs(to, from) => format!("movz{}{}", to, from),
                     Movz(to, from) => format!("movs{}{}", to, from),
                     Sub(s) => format!("sub{}", s),
+                    Div => "div".into(),
                     Jmp => "jmp".into(),
                     Jne => "jne".into(),
                     Je => "je".into(),

@@ -1,14 +1,18 @@
 use crate::{ic_info::ICLineNumber, istatement::IStatement};
-use std::fmt;
+use std::{collections::VecDeque, fmt};
 
 #[derive(Default)]
 pub struct IntermediateCode {
-    statements: Vec<IStatement>,
+    // An index in the statements list might temporarily be None (e.g. during dead code elimination)
+    // but will never be None when actually read.
+    statements: VecDeque<Option<IStatement>>,
 }
 
 impl IntermediateCode {
     pub fn new() -> IntermediateCode {
-        IntermediateCode { statements: vec![] }
+        IntermediateCode {
+            statements: VecDeque::new(),
+        }
     }
 
     pub fn n_statements(&self) -> usize {
@@ -16,24 +20,38 @@ impl IntermediateCode {
     }
 
     pub fn append_statement(&mut self, statement: IStatement) {
-        self.statements.push(statement);
+        self.statements.push_back(Some(statement));
     }
 
     pub fn insert_statement(&mut self, statement: IStatement, line: ICLineNumber) {
-        self.statements.insert(line.0 - 1, statement);
+        self.statements.insert(line.0 - 1, Some(statement));
+    }
+
+    /// Filter out all the temporarily `None` statements
+    pub fn filter_none(&mut self) {
+        self.statements = self
+            .statements
+            .iter()
+            .filter(|s| s.is_some())
+            .cloned()
+            .collect();
     }
 
     pub fn remove_statement(&mut self, line: ICLineNumber) {
-        self.statements.remove(line.0 - 1);
+        *self.statements.get_mut(line.0 - 1).unwrap() = None;
     }
 
     /// [ICLineNumber] (not index) means '1' is the first statement
     pub fn get_statement(&self, line: ICLineNumber) -> &IStatement {
-        &self.statements[line.0 - 1]
+        self.statements[line.0 - 1].as_ref().unwrap()
     }
 
-    pub fn get_statements(&self, start: ICLineNumber, end: ICLineNumber) -> &[IStatement] {
-        &self.statements[start.0 - 1..end.0 - 1]
+    pub fn get_statements(&self, start: ICLineNumber, end: ICLineNumber) -> Vec<&IStatement> {
+        let mut vec = vec![];
+        for i in self.statements.range(start.0 - 1..end.0 - 1) {
+            vec.push(i.as_ref().unwrap());
+        }
+        vec
     }
 
     pub fn get_last_statement(&self) -> &IStatement {

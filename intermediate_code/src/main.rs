@@ -3,10 +3,12 @@ pub mod flow_graph;
 pub mod ic_generator;
 pub mod ic_info;
 pub mod icode;
+mod icode_optimization;
 pub mod ioperand;
 pub mod ioperator;
 pub mod istatement;
 pub mod ivisitor;
+mod syntax_tree_optimization;
 
 use crate::error::ICodeError;
 use crate::flow_graph::FlowGraph;
@@ -49,9 +51,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         (@arg annotate: -a --annotate "Also print the annotated intermediate code")
         (@arg flowgraph: +takes_value -g --flowgraph  "Save the control flow graph in .png format to the provided file. Requires the Graphviz library (`dot`).")
         (@arg INPUT: +required "Sets the input")
+        (@arg OPTIMIZE: -O +takes_value "Optimize compiler output. Takes a value between 0 and 3 (inclusive).")
     )
     .get_matches();
     init_logger_from_env();
+    let opt_level = match matches.value_of("OPTIMIZE") {
+        Some("1") => OptLevel::Pre,
+        Some("2") => OptLevel::Post,
+        Some("3") => OptLevel::Both,
+        None | Some("0") => OptLevel::None,
+        _ => unreachable!(),
+    };
+    log::info!("Using `{:?}` optimization", opt_level);
     let annotate = matches.is_present("annotate");
     let graph_filename = matches.value_of("flowgraph");
     let input = matches.value_of("INPUT").unwrap();
@@ -59,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let SyntaxAnalysisResult {
         errors,
         mut symbol_table,
-        tree,
+        mut tree,
         warnings,
     } = syntax::generate(&input)?;
     let has_errors = !errors.is_empty();
@@ -72,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         ))));
     }
     syntax::display_warnings(&warnings);
-    let ic = ic_generator::generate(&tree, &mut symbol_table, OptLevel::None);
+    let ic = ic_generator::generate(&mut tree, &mut symbol_table, opt_level);
     log::info!("\n{}", symbol_table);
     log::info!("\n{}", tree);
     match ic {

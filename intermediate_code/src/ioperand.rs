@@ -2,7 +2,7 @@ use std::fmt;
 
 use syntax::{ConstantNodeValue, ReturnType, SymbolId};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum IOperand {
     Unknown,
     Immediate {

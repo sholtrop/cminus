@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         (about: "Produce x86 assembly code for the given input C-minus file")
         (@arg INPUT: +required "Sets the input")
         (@arg OUTPUT: -o +takes_value "Sets the output")
-        (@arg OPTIMIZE: -O +takes_value "Optimize compiler output")
+        (@arg OPTIMIZE: -O +takes_value "Optimize compiler output. Takes a value between 0 and 3 (inclusive).")
     )
     .get_matches();
     init_logger_from_env();

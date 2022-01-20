@@ -60,6 +60,10 @@ impl<'a> CodeGenerator<'a> {
                     let (lhs, rhs, ret) = stmt.get_triple();
                     self.emitter.emit_sub(lhs, rhs, &ret.id());
                 }
+                Mul => {
+                    let (lhs, rhs, ret) = stmt.get_triple();
+                    self.emitter.emit_mul(lhs, rhs, &ret.id());
+                }
                 Coerce => {
                     let src = stmt.operand1.as_ref().unwrap();
                     let dest = stmt.ret_target.as_ref().unwrap().id();
@@ -72,11 +76,13 @@ impl<'a> CodeGenerator<'a> {
                 }
                 Param => self.emitter.emit_param(stmt.operand1.as_ref().unwrap()),
                 Je | Jne | Jz | Jnz | Ja | Jae | Jb | Jbe | Jg | Jge | Jl | Jle => {
-                    let expr = stmt.operand1.as_ref().unwrap();
+                    let l_exp = stmt.operand1.as_ref().unwrap();
+                    let r_exp = stmt.operand2.as_ref();
                     self.emitter.emit_conditional_jump(
                         &stmt.operator,
                         &stmt.ret_target.as_ref().unwrap().id(),
-                        expr,
+                        l_exp,
+                        r_exp,
                     );
                 }
                 Goto => {
@@ -89,7 +95,11 @@ impl<'a> CodeGenerator<'a> {
                     self.emitter.emit_set(&stmt.operator, l, r, &ret_id);
                 }
                 Label => self.emitter.emit_label(&stmt.label_id()),
-
+                Mod | Div => {
+                    let (l, r, ret) = stmt.get_triple();
+                    let ret_id = ret.id();
+                    self.emitter.emit_div_mod(l, r, &ret_id, &stmt.operator);
+                }
                 _ => todo!("{}", stmt),
             }
         }

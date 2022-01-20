@@ -190,37 +190,53 @@ impl SymbolTable {
         Some(symbols)
     }
 
-    pub fn add_label(&mut self, name: String, func_id: SymbolId) -> SymbolId {
-        self.add_symbol(
-            Symbol {
-                name: SymbolName(name),
-                symbol_type: SymbolType::Label,
-                line: 0,
-                return_type: ReturnType::Label,
+    pub fn add_label(&mut self, func_id: SymbolId) -> SymbolId {
+        let name = ".L".to_string() + &self.id_count.to_string();
+        let id = SymbolId(self.id_count);
+        self.symbols.insert(
+            id,
+            SymbolInfo {
+                id,
+                symbol: Symbol {
+                    line: 0,
+                    name: SymbolName(name),
+                    return_type: ReturnType::Label,
+                    symbol_type: SymbolType::Label,
+                },
+                symbol_scope: SymbolScope::Local {
+                    owning_function: func_id,
+                },
             },
-            SymbolScope::Local {
-                owning_function: func_id,
-            },
-        )
+        );
+        self.id_count += 1;
+        id
     }
 
     pub fn add_tempvar(
         &mut self,
         return_type: ReturnType,
-        name: String,
+        // name: String,
         func_id: SymbolId,
     ) -> SymbolId {
-        self.add_symbol(
-            Symbol {
-                name: SymbolName(name),
-                symbol_type: SymbolType::TempVar,
-                line: 0,
-                return_type,
+        let name = "&".to_string() + &self.id_count.to_string();
+        let id = SymbolId(self.id_count);
+        self.symbols.insert(
+            id,
+            SymbolInfo {
+                id,
+                symbol: Symbol {
+                    line: 0,
+                    name: SymbolName(name),
+                    return_type,
+                    symbol_type: SymbolType::TempVar,
+                },
+                symbol_scope: SymbolScope::Local {
+                    owning_function: func_id,
+                },
             },
-            SymbolScope::Local {
-                owning_function: func_id,
-            },
-        )
+        );
+        self.id_count += 1;
+        id
     }
 
     /// Return all the global symbols in the [SymbolTable].

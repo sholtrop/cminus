@@ -8,7 +8,7 @@ lazy_static! {
     pub static ref TESTING: bool = std::env::var("TESTING").map_or(false, |s| s != "0");
 }
 
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Hash, Eq, PartialOrd, Ord, Copy)]
 pub enum NodeType {
     Unknown,
     Error,
@@ -124,9 +124,23 @@ impl NodeType {
                 | Self::ArrayAccess
         )
     }
+
+    pub fn is_rel_expression(&self) -> bool {
+        matches!(
+            self,
+            Self::RelEqual
+                | Self::RelNotEqual
+                | Self::RelGT
+                | Self::RelGTE
+                | Self::RelLT
+                | Self::RelLTE
+                | Self::And
+                | Self::Or
+        )
+    }
 }
 
-#[derive(PartialEq, Clone, Debug, Copy)]
+#[derive(Clone, Debug, Copy)]
 pub enum ConstantNodeValue {
     Uint8(u8),
     Int8(i8),
@@ -188,6 +202,86 @@ impl std::ops::Sub for ConstantNodeValue {
     }
 }
 
+impl std::ops::Mul for ConstantNodeValue {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (ConstantNodeValue::Int(x), ConstantNodeValue::Int(y)) => {
+                ConstantNodeValue::Int(i32::wrapping_mul(x, y))
+            }
+            (ConstantNodeValue::Uint(x), ConstantNodeValue::Uint(y)) => {
+                ConstantNodeValue::Uint(u32::wrapping_mul(x, y))
+            }
+
+            (ConstantNodeValue::Int8(x), ConstantNodeValue::Int8(y)) => {
+                ConstantNodeValue::Int8(i8::wrapping_mul(x, y))
+            }
+
+            (ConstantNodeValue::Uint8(x), ConstantNodeValue::Uint8(y)) => {
+                ConstantNodeValue::Uint8(u8::wrapping_mul(x, y))
+            }
+            _ => unreachable!(
+                "Cannot multiply two different ConstantNodeValue types: {:?} and {:?}",
+                self, rhs
+            ),
+        }
+    }
+}
+
+impl std::ops::Div for ConstantNodeValue {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (ConstantNodeValue::Int(x), ConstantNodeValue::Int(y)) => {
+                ConstantNodeValue::Int(i32::wrapping_div(x, y))
+            }
+            (ConstantNodeValue::Uint(x), ConstantNodeValue::Uint(y)) => {
+                ConstantNodeValue::Uint(u32::wrapping_div(x, y))
+            }
+
+            (ConstantNodeValue::Int8(x), ConstantNodeValue::Int8(y)) => {
+                ConstantNodeValue::Int8(i8::wrapping_div(x, y))
+            }
+
+            (ConstantNodeValue::Uint8(x), ConstantNodeValue::Uint8(y)) => {
+                ConstantNodeValue::Uint8(u8::wrapping_div(x, y))
+            }
+            _ => unreachable!(
+                "Cannot multiply two different ConstantNodeValue types: {:?} and {:?}",
+                self, rhs
+            ),
+        }
+    }
+}
+
+impl PartialOrd for ConstantNodeValue {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let l = i64::from(*self);
+        let r = i64::from(*other);
+        i64::partial_cmp(&l, &r)
+    }
+}
+
+impl PartialEq for ConstantNodeValue {
+    fn eq(&self, other: &Self) -> bool {
+        let l = i64::from(*self);
+        let r = i64::from(*other);
+        i64::eq(&l, &r)
+    }
+}
+
+impl Eq for ConstantNodeValue {}
+
+impl Ord for ConstantNodeValue {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        let l = i64::from(*self);
+        let r = i64::from(*other);
+        i64::cmp(&l, &r)
+    }
+}
+
 impl fmt::Display for ConstantNodeValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -210,6 +304,36 @@ impl From<ConstantNodeValue> for i64 {
             ConstantNodeValue::Int8(v) => v.into(),
             ConstantNodeValue::Uint(v) => v.into(),
             ConstantNodeValue::Uint8(v) => v.into(),
+        }
+    }
+}
+
+impl From<i64> for ConstantNodeValue {
+    fn from(number: i64) -> Self {
+        let number = number.to_string();
+        if let Ok(num) = number.parse::<i8>() {
+            ConstantNodeValue::Int8(num)
+        } else if let Ok(num) = number.parse::<u8>() {
+            ConstantNodeValue::Uint8(num)
+        } else if let Ok(num) = number.parse::<i32>() {
+            ConstantNodeValue::Int(num)
+        } else if let Ok(num) = number.parse::<u32>() {
+            ConstantNodeValue::Uint(num)
+        } else {
+            panic!("Invalid number: {}", number);
+        }
+    }
+}
+
+impl ConstantNodeValue {
+    pub fn new_with_ret(value: i64, ret: ReturnType) -> Self {
+        match ret {
+            ReturnType::Uint8 => Self::Uint8(value as u8),
+            ReturnType::Uint => Self::Uint(value as u32),
+            ReturnType::Int8 => Self::Int8(value as i8),
+            ReturnType::Int => Self::Int(value as i32),
+            ReturnType::Bool => Self::Uint8((value != 0) as u8),
+            _ => unreachable!(),
         }
     }
 }
@@ -258,9 +382,67 @@ impl Iterator for PreorderIter {
     }
 }
 
+pub struct PostorderIter {
+    nodes: Vec<SyntaxNodeBox>,
+    last_visited: Option<SyntaxNodeBox>,
+    root: Option<SyntaxNodeBox>,
+}
+
+impl PostorderIter {
+    pub fn new(root: SyntaxNodeBox) -> Self {
+        Self {
+            nodes: vec![root.clone()],
+            last_visited: None,
+            root: Some(root),
+        }
+    }
+}
+
+impl Iterator for PostorderIter {
+    type Item = SyntaxNodeBox;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let root = self.root.clone();
+            if let Some(root) = &root {
+                self.nodes.push(root.clone());
+                self.root = match &*root.borrow() {
+                    SyntaxNode::Binary { left: Some(l), .. } => Some(l.clone()),
+                    SyntaxNode::Unary { child, .. } => child.clone(),
+                    _ => None,
+                };
+            } else if let Some(peek) = self.nodes.last() {
+                let right = match &*peek.borrow() {
+                    SyntaxNode::Binary { right: Some(r), .. } => Some(r.clone()),
+                    _ => None,
+                };
+                match (&self.last_visited, right) {
+                    (Some(last_visited), Some(right)) => {
+                        if last_visited.as_ptr() != right.as_ptr() {
+                            self.root = Some(right);
+                        } else {
+                            self.last_visited = self.nodes.pop();
+                            break self.last_visited.clone();
+                        }
+                    }
+                    _ => {
+                        self.last_visited = self.nodes.pop();
+                        break self.last_visited.clone();
+                    }
+                }
+            } else {
+                break None;
+            }
+        }
+    }
+}
+
 pub type SyntaxCell = RefCell<SyntaxNode>;
 pub type SyntaxNodeBox = Rc<SyntaxCell>;
 pub type SyntaxNodeChild = Option<SyntaxNodeBox>;
+
+#[derive(PartialEq, Eq)]
+pub struct SyntaxNodeId(usize);
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum SyntaxNode {
@@ -363,6 +545,10 @@ impl SyntaxNode {
         PreorderIter::new(root.clone())
     }
 
+    pub fn postorder(root: &SyntaxNodeBox) -> PostorderIter {
+        PostorderIter::new(root.clone())
+    }
+
     /*
     assign => 0,
     or | and => 1,
@@ -449,7 +635,12 @@ impl SyntaxNode {
                 | NodeType::RelGTE
                 | NodeType::RelLT
                 | NodeType::RelLTE
-                | NodeType::Assignment
+        )
+    }
+    pub fn is_unop(&self) -> bool {
+        matches!(
+            self.node_type(),
+            NodeType::SignMinus | NodeType::Not | NodeType::SignPlus | NodeType::Coercion
         )
     }
 }

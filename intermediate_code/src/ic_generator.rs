@@ -1,9 +1,11 @@
 use crate::{
-    error::ICodeError, flow_graph::FlowGraph, icode::IntermediateCode, ivisitor::IVisitor,
+    error::ICodeError, flow_graph::FlowGraph, icode::IntermediateCode, icode_optimization,
+    ivisitor::IVisitor, syntax_tree_optimization,
 };
 use std::fmt;
 use syntax::{SymbolTable, SyntaxTree};
 
+#[derive(Debug)]
 pub enum OptLevel {
     None,
     Pre,
@@ -16,26 +18,28 @@ pub struct Intermediate {
     pub graph: FlowGraph,
 }
 
-fn preprocess(tree: &SyntaxTree, table: &mut SymbolTable) {
-    // TODO:
-    // - Constant folding
-    // - Dead code elimination
-    //
+fn preprocess(tree: &mut SyntaxTree, table: &mut SymbolTable) {
+    syntax_tree_optimization::fold_constants(tree);
 }
 
-fn postprocess(icode: &mut IntermediateCode, table: &mut SymbolTable) {
+fn postprocess(
+    icode: &mut IntermediateCode,
+    table: &mut SymbolTable,
+    flowgraph: &FlowGraph,
+) -> FlowGraph {
     // TODO:
     //  - consolidate returns
-    //    Don't copy return code but jump to a single return at the end where applicable
-    //
+    //    i.e. Don't copy return code but jump to a single return at the end where applicable
+
+    icode_optimization::eliminate_dead_code(icode, flowgraph, table)
 }
 
 pub fn generate(
-    tree: &SyntaxTree,
+    tree: &mut SyntaxTree,
     table: &mut SymbolTable,
     opt_level: OptLevel,
 ) -> Result<Intermediate, ICodeError> {
-    if matches!(opt_level, OptLevel::Pre | OptLevel::Post) {
+    if matches!(opt_level, OptLevel::Pre | OptLevel::Both) {
         preprocess(tree, table)
     }
 
@@ -48,10 +52,10 @@ pub fn generate(
         visitor.visit_function(func, id);
     }
     let mut icode = visitor.result();
+    let mut graph = FlowGraph::new(table, &icode);
     if matches!(opt_level, OptLevel::Post | OptLevel::Both) {
-        postprocess(&mut icode, table);
+        graph = postprocess(&mut icode, table, &graph);
     }
-    let graph = FlowGraph::new(table, &icode);
     for (l, _) in (&icode).into_iter() {
         log::trace!("{}. is reachable: {}", l, graph.is_reachable(&l));
     }

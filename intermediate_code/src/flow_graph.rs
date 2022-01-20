@@ -143,11 +143,9 @@ impl FlowGraph {
         let mut leader_to_block = HashMap::new();
         let mut block_map = HashMap::new();
         for curr_leader in iter {
-            log::trace!("leader: {}", curr_leader);
             let block = BasicBlock::new(*prev_leader, *curr_leader - 1);
             let id = graph.alloc(block);
             for line in prev_leader.0..curr_leader.0 {
-                log::trace!("line: {}", line);
                 block_map.insert(ICLineNumber(line), id);
             }
             leader_to_block.insert(*prev_leader, id);
@@ -166,7 +164,6 @@ impl FlowGraph {
                 graph.get_mut(last).unwrap().is_entry = true;
             }
             for line in prev_leader.0..(last_line + 1).0 {
-                log::trace!("line: {}", line);
                 block_map.insert(ICLineNumber(line), last);
             }
         }
@@ -247,7 +244,6 @@ impl FlowGraph {
         for (l, stmt) in icode {
             let mut def = HashSet::new();
             if stmt.operator == IOperator::Assign {
-                log::trace!("{}", stmt);
                 def.insert(stmt.ret_target.as_ref().unwrap().id());
             }
             liveness.def.insert(l, def);
@@ -333,7 +329,6 @@ impl FlowGraph {
         leader_to_block: &HashMap<ICLineNumber, BasicBlockId>,
         info: &ICInfo,
     ) {
-        log::trace!("Returns: {:#?}", info.returns);
         for (id, calls) in &info.calls {
             if let Some(returns) = info.returns.get(id) {
                 for call in calls {
@@ -342,7 +337,6 @@ impl FlowGraph {
                         let ret_bid = {
                             let (ret_bid, ret_block) =
                                 graph.iter_mut().find(|(_, b)| b.end == *ret).unwrap();
-                            log::trace!("{} returns to {}", ret, *call + 1);
                             ret_block.outgoing.push(after_call_bid);
                             ret_bid
                         };

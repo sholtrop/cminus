@@ -8,13 +8,15 @@ pub mod flow_graph;
 pub mod ic_generator;
 pub mod ic_info;
 pub mod icode;
+mod icode_optimization;
 pub mod ioperand;
 pub mod ioperator;
 pub mod istatement;
 pub mod ivisitor;
+mod syntax_tree_optimization;
 
 pub fn generate(
-    tree: &SyntaxTree,
+    tree: &mut SyntaxTree,
     symbol_table: &mut SymbolTable,
     opt: OptLevel,
 ) -> Result<Intermediate, ICodeError> {
@@ -24,8 +26,8 @@ pub fn generate(
 pub fn generate_from_str(input: &str, opt: OptLevel) -> Result<Intermediate, ICodeError> {
     let SyntaxAnalysisResult {
         mut symbol_table,
-        tree,
+        mut tree,
         ..
     } = syntax::generate(input).unwrap();
-    generate(&tree, &mut symbol_table, opt)
+    generate(&mut tree, &mut symbol_table, opt)
 }

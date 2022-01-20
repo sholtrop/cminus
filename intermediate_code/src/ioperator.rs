@@ -228,4 +228,17 @@ impl IOperator {
             _ => self,
         }
     }
+
+    /// Convert a Setx instruction to a Jumpx
+    pub fn to_jump(self) -> Self {
+        match self {
+            Self::SetE => Self::Je,
+            Self::SetNE => Self::Jne,
+            Self::SetG => Self::Jg,
+            Self::SetGE => Self::Jge,
+            Self::SetL => Self::Jl,
+            Self::SetLE => Self::Jle,
+            _ => unreachable!(),
+        }
+    }
 }

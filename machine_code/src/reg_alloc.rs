@@ -26,7 +26,6 @@ impl From<StoredLocation> for Src {
             StoredLocation::Global(l) => Src::Global(l),
             StoredLocation::Reg(r) => Src::Register(r),
             StoredLocation::Stack(s) => Src::Stack(s),
-            _ => unreachable!(),
         }
     }
 }
@@ -38,7 +37,7 @@ pub struct RegAlloc<'a> {
     out: OutStream,
     reg_locals: HashMap<SymbolId, RegisterName>,
     stack_locals: HashMap<SymbolId, StackOffset>,
-    param_regs: BinaryHeap<RegisterName>,
+    param_regs: Vec<RegisterName>,
     gpurpose_regs: BinaryHeap<RegisterName>,
     table: &'a SymbolTable,
     graph: &'a FlowGraph,
@@ -61,8 +60,10 @@ impl<'a> RegAlloc<'a> {
             out,
             reg_locals: HashMap::new(),
             stack_locals: HashMap::new(),
-            param_regs: BinaryHeap::from_iter(PARAM_REGS),
-            gpurpose_regs: BinaryHeap::from_iter([R15, R14, R13, R12, R11, R10]),
+            param_regs: Vec::from_iter(PARAM_REGS),
+            gpurpose_regs: BinaryHeap::from_iter([
+                R15, R14, R13, R12, /* R11, R10 are caller-saved and get clobbered */
+            ]),
             table,
             graph,
             current_line: ICLineNumber(1),
@@ -151,7 +152,8 @@ impl<'a> RegAlloc<'a> {
     }
 
     pub fn free_param_regs(&mut self) {
-        self.param_regs = BinaryHeap::from_iter(PARAM_REGS);
+        log::debug!("Freeing param regs");
+        self.param_regs = Vec::from_iter(PARAM_REGS);
     }
 
     /// Assigns a register to a single [SymbolId] `sym` based on the following rules:

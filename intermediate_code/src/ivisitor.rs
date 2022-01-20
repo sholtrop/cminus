@@ -2,18 +2,18 @@ use crate::icode::IntermediateCode;
 use crate::ioperand::IOperand;
 use crate::ioperator::{IOperator, IOperatorSize};
 use crate::istatement::IStatement;
+use syntax::{ConstantNodeValue, SymbolId, SyntaxNode, SyntaxNodeBox};
 use syntax::{
     NodeType::{self, *},
     ReturnType,
 };
-use syntax::{SymbolId, SyntaxCell, SyntaxNode, SyntaxNodeBox};
 
 pub struct IVisitor<'a> {
     table: &'a mut syntax::SymbolTable,
     icode: IntermediateCode,
     func_stack: Vec<SymbolId>,
-    label_counter: usize,
-    temp_counter: usize,
+    // label_counter: usize,
+    // temp_counter: usize,
 }
 
 impl<'a> IVisitor<'a> {
@@ -22,8 +22,8 @@ impl<'a> IVisitor<'a> {
             table,
             icode: IntermediateCode::new(),
             func_stack: vec![],
-            label_counter: 0,
-            temp_counter: 0,
+            // label_counter: 0,
+            // temp_counter: 0,
         }
     }
     pub fn result(self) -> IntermediateCode {
@@ -79,7 +79,6 @@ impl<'a> IVisitor<'a> {
     // int x = 0 && func();
     // should never call `func`
     fn accept_expression(&mut self, exp: SyntaxNodeBox) -> IOperand {
-        // let (*exp.borrow()) = (*exp.borrow());
         let ntype = (*exp.borrow()).node_type();
         log::trace!("Expression: {}", ntype);
         match ntype {
@@ -90,9 +89,10 @@ impl<'a> IVisitor<'a> {
             Add | Sub | Mul | Div | Mod | And | Or | RelEqual | RelNotEqual | RelGT | RelGTE
             | RelLT | RelLTE => {
                 let (l, r) = (*exp.borrow()).get_both_binary_children();
-                let ret_type = match ntype {
-                    RelEqual | RelNotEqual | RelGT | RelGTE | RelLT | RelLTE => ReturnType::Bool,
-                    _ => (*l.borrow()).return_type(),
+                let ret_type = if ntype.is_rel_expression() {
+                    ReturnType::Bool
+                } else {
+                    (*l.borrow()).return_type()
                 };
                 let operator = if ret_type.is_unsigned() {
                     IOperator::from(ntype).to_unsigned()
@@ -100,7 +100,15 @@ impl<'a> IVisitor<'a> {
                     IOperator::from(ntype)
                 };
                 let l_expr = self.accept_expression(l);
-                let r_expr = self.accept_expression(r);
+                let mut r_expr = self.accept_expression(r);
+
+                // if matches!(ntype, Div | Mod) {
+                //     // Div and Mod require the divisor to be in a register
+                //     if let IOperand::Immediate { ret_type, .. } = r_expr {
+                //         let temp = self.make_temp(ret_type);
+                //         r_expr = IOperand::Symbol { id: temp, ret_type };
+                //     }
+                // }
 
                 let ret = self.make_temp(ret_type);
                 let ret_target = IOperand::Symbol { id: ret, ret_type };
@@ -146,7 +154,7 @@ impl<'a> IVisitor<'a> {
                     symbol_id,
                     return_type,
                     ..
-                } = (*exp.borrow())
+                } = *exp.borrow()
                 {
                     IOperand::Symbol {
                         id: symbol_id,
@@ -199,6 +207,44 @@ impl<'a> IVisitor<'a> {
         }
     }
 
+    fn accept_cond_expression(&mut self, exp: SyntaxNodeBox) -> (IOperator, IOperand, IOperand) {
+        let ntype = (*exp.borrow()).node_type();
+        if ntype.is_rel_expression() {
+            let (l, r) = (*exp.borrow()).get_both_binary_children();
+            let l_expr = self.accept_expression(l);
+            let r_expr = self.accept_expression(r);
+            let op = IOperator::from(ntype).to_jump();
+            log::debug!("Condop: {} | ntype: {}", op, ntype);
+            (op, l_expr, r_expr)
+        } else if ntype == NodeType::Coercion {
+            let l = (*exp.borrow()).get_unary_child().unwrap();
+            let expr = self.accept_expression(l);
+            (
+                IOperator::Jne,
+                expr,
+                IOperand::Immediate {
+                    value: ConstantNodeValue::from(0),
+                    ret_type: ReturnType::Bool,
+                },
+            )
+        } else if ntype == NodeType::Num {
+            let num = self.accept_expression(exp);
+            (
+                IOperator::Je,
+                num,
+                IOperand::Immediate {
+                    value: ConstantNodeValue::from(0),
+                    ret_type: ReturnType::Bool,
+                },
+            )
+        } else {
+            unreachable!(
+                "accept_cond_expression only accept relational operators, coercions or num, got {}",
+                ntype
+            );
+        }
+    }
+
     pub fn visit_function(&mut self, func: SyntaxNodeBox, func_id: SymbolId) {
         if func_id.is_builtin() {
             return;
@@ -241,7 +287,6 @@ impl<'a> IVisitor<'a> {
     fn visit_assignment(&mut self, l_var: SyntaxNodeBox, r_expr: SyntaxNodeBox) -> IOperand {
         // let l_var = *l_var.borrow();
         // let r_expr = *r_expr.borrow();
-        log::trace!("Assignment: {} | {}", *l_var.borrow(), *r_expr.borrow());
         let common_ret = (*l_var.borrow()).return_type().to_base_type();
         let ret_target = if (*l_var.borrow()).node_type() == NodeType::ArrayAccess {
             self.visit_array_access(l_var)
@@ -268,14 +313,14 @@ impl<'a> IVisitor<'a> {
         if_branch: SyntaxNodeBox,
         else_branch: Option<SyntaxNodeBox>,
     ) {
-        let cond_expr = self.accept_expression(cond);
+        let (op, l, r) = self.accept_cond_expression(cond);
         let else_label = self.make_label();
         // Check condition, jump to else-label if condition was false
         self.icode.append_statement(IStatement {
             op_type: IOperatorSize::Void,
-            operator: IOperator::Jne,
-            operand1: Some(cond_expr),
-            operand2: None,
+            operator: op,
+            operand1: Some(l),
+            operand2: Some(r),
             ret_target: Some(IOperand::Symbol {
                 id: else_label,
                 ret_type: ReturnType::Void,
@@ -315,12 +360,12 @@ impl<'a> IVisitor<'a> {
         self.accept(body);
         self.icode
             .append_statement(IStatement::make_label(loop_cond));
-        let cond_expr = self.accept_expression(cond);
+        let (op, l, r) = self.accept_cond_expression(cond);
         self.icode.append_statement(IStatement {
             op_type: IOperatorSize::Void,
-            operator: IOperator::Jne,
-            operand1: Some(cond_expr),
-            operand2: None,
+            operator: op,
+            operand1: Some(l),
+            operand2: Some(r),
             ret_target: Some(IOperand::Symbol {
                 id: loop_body,
                 ret_type: ReturnType::Void,
@@ -417,14 +462,10 @@ impl<'a> IVisitor<'a> {
     }
 
     fn make_temp(&mut self, ret_type: ReturnType) -> SymbolId {
-        let name = "&".to_string() + &self.temp_counter.to_string();
-        self.temp_counter += 1;
-        self.table.add_tempvar(ret_type, name, self.current_func())
+        self.table.add_tempvar(ret_type, self.current_func())
     }
 
     fn make_label(&mut self) -> SymbolId {
-        let name = ".L".to_string() + &self.label_counter.to_string();
-        self.label_counter += 1;
-        self.table.add_label(name, self.current_func())
+        self.table.add_label(self.current_func())
     }
 }
